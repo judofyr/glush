@@ -17,6 +17,15 @@ class TestParser < Minitest::Spec
     end
   end
 
+  def self.assert_marks(input, marks)
+    it "should match marks" do
+      parser = Glush::Parser.new(grammar)
+      parser.push_string(input)
+      parser.close
+      assert_equal parser.flat_marks.map(&:to_a), marks
+    end
+  end
+
   describe(:paren) do
     let(:grammar) { TestGrammars.paren }
 
@@ -72,6 +81,18 @@ class TestParser < Minitest::Spec
     assert_recognize "1+1"
     assert_recognize "1+1*1/1-1*1-1"
     refute_recognize "1+1*1/1-11-1"
+
+    assert_marks "1", [[:one, 0]]
+    assert_marks "1+1", [[:add, 0], [:one, 0], [:one, 2]]
+    assert_marks "1+1*1+1", [
+      [:add, 0],
+        [:add, 0],
+          [:one, 0],
+          [:mul, 2],
+            [:one, 2],
+            [:one, 4],
+        [:one, 6]
+    ]
   end
 end
 

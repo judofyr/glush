@@ -30,6 +30,10 @@ module Glush
       Patterns::Eps.new
     end
 
+    def mark(name)
+      Patterns::Marker.new(name)
+    end
+
     def sep_by(p, sep)
       sep_by1(p, sep).maybe
     end

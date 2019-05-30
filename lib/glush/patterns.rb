@@ -81,6 +81,28 @@ module Glush
       end
     end
 
+    class Marker < Base
+      attr_reader :name
+
+      def initialize(name)
+        @name = name
+      end
+
+      def copy
+        Marker.new(@name)
+      end
+
+      def calculate_empty(b)
+        @is_empty = false
+      end
+
+      include Terminal
+
+      def inspect
+        "mark(#{@name})"
+      end
+    end
+
     class Eps < Base
       def consume!
         self

@@ -99,20 +99,20 @@ module TestGrammars
     @manual_expr ||= Glush::Grammar.new {
       rule \
       def add_expr
-        add_expr >> str("+") >> mul_expr |
-        add_expr >> str("-") >> mul_expr |
+        mark(:add) >> add_expr >> str("+") >> mul_expr |
+        mark(:sub) >> add_expr >> str("-") >> mul_expr |
         mul_expr
       end
 
       rule \
       def mul_expr
-        mul_expr >> str("*") >> base |
-        mul_expr >> str("/") >> base |
+        mark(:mul) >> mul_expr >> str("*") >> base |
+        mark(:div) >> mul_expr >> str("/") >> base |
         base
       end
 
       def base
-        str("1")
+        mark(:one) >> str("1")
       end
 
       def expr
