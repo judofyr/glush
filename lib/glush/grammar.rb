@@ -82,6 +82,10 @@ module Glush
         end
 
         rule.body.last_set.each do |lst|
+          if lst.is_a?(Patterns::Marker)
+            raise GrammarError, "rule #{rule.inspect} cannot have #{lst.inspect} in final position"
+          end
+
           @transitions[lst] << rule
         end
       end

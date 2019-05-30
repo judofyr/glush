@@ -94,5 +94,24 @@ class TestParser < Minitest::Spec
         [:one, 6]
     ]
   end
+
+  it "should reject empty mark rules" do
+    assert_raises Glush::GrammarError do
+      Glush::Grammar.new {
+        rule \
+        def m
+          mark(:empty) |
+          mark(:non_empty) >> str("a")
+        end
+
+        rule \
+        def main
+          m | m >> str("a")
+        end
+
+        main
+      }
+    end
+  end
 end
 
