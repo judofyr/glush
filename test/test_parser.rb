@@ -97,7 +97,7 @@ class TestParser < Minitest::Spec
 
   it "should reject empty mark rules" do
     assert_raises Glush::GrammarError do
-      Glush::Grammar.new {
+      g = Glush::Grammar.new {
         rule \
         def m
           mark(:empty) |
@@ -111,6 +111,48 @@ class TestParser < Minitest::Spec
 
         main
       }
+
+      recognize?(g, "a")
+    end
+  end
+
+  it "should reject seq empty mark rules" do
+    assert_raises Glush::GrammarError do
+      g = Glush::Grammar.new {
+        rule \
+        def m
+          mark(:empty) >> mark(:empty)
+        end
+
+        rule \
+        def main
+          m | m >> str("a")
+        end
+
+        main
+      }
+
+      recognize?(g, "a")
+    end
+  end
+
+  it "should reject many empty mark rules" do
+    assert_raises Glush::GrammarError do
+      g = Glush::Grammar.new {
+        rule \
+        def m
+          mark(:empty).plus
+        end
+
+        rule \
+        def main
+          m | m >> str("a")
+        end
+
+        main
+      }
+
+      recognize?(g, "a")
     end
   end
 end

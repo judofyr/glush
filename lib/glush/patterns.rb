@@ -53,6 +53,10 @@ module Glush
 
       def each_pair
       end
+
+      def static?
+        empty?
+      end
     end
 
     class Char < Base
@@ -94,6 +98,10 @@ module Glush
 
       def calculate_empty(b)
         @is_empty = false
+      end
+
+      def static?
+        true
       end
 
       include Terminal
@@ -140,6 +148,10 @@ module Glush
         @is_empty = @left.calculate_empty(b) | @right.calculate_empty(b)
       end
 
+      def static?
+        @left.static? or @right.static?
+      end
+
       def first_set
         @first_set ||= @left.first_set | @right.first_set
       end
@@ -166,6 +178,10 @@ module Glush
 
       def calculate_empty(b)
         @is_empty = @left.calculate_empty(b) & @right.calculate_empty(b)
+      end
+
+      def static?
+        @left.static? && @right.static?
       end
 
       def first_set
@@ -199,6 +215,10 @@ module Glush
 
       def calculate_empty(b)
         @is_empty = @child.calculate_empty(b)
+      end
+
+      def static?
+        @child.static?
       end
 
       def first_set
