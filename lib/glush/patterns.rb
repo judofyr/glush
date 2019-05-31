@@ -85,6 +85,91 @@ module Glush
       end
     end
 
+    module FixedToken
+      def copy
+        self.class.new
+      end
+
+      def calculate_empty(b)
+        @is_empty = false
+      end
+
+      include Terminal
+
+      def inspect
+        self.class.name
+      end
+    end
+
+    class Any < Base
+      include FixedToken
+
+      def match?(token)
+        true
+      end
+    end
+
+    class UTF8Char1 < Base
+      include FixedToken
+      RANGE = (0..0b0111_1111)
+
+      def match?(token)
+        RANGE.cover?(token)
+      end
+
+      def complete
+        self
+      end
+    end
+
+    class UTF8Char2 < Base
+      include FixedToken
+      RANGE = (0b1100_0000..0b1101_1111)
+
+      def match?(token)
+        RANGE.cover?(token)
+      end
+
+      def complete
+        self >> UTF8CharLast.new
+      end
+    end
+
+    class UTF8Char3 < Base
+      include FixedToken
+      RANGE = (0b1110_0000..0b1110_1111)
+
+      def match?(token)
+        RANGE.cover?(token)
+      end
+
+      def complete
+        self >> UTF8CharLast.new >> UTF8CharLast.new
+      end
+    end
+
+    class UTF8Char4 < Base
+      include FixedToken
+      RANGE = (0b1111_0000..0b1111_0111)
+
+      def match?(token)
+        RANGE.cover?(token)
+      end
+
+      def complete
+        self >> UTF8CharLast.new >> UTF8CharLast.new >> UTF8CharLast.new
+      end
+    end
+
+    class UTF8CharLast < Base
+      include FixedToken
+      RANGE = (0b1000_0000..0b1011_1111)
+
+      def match?(token)
+        RANGE.cover?(token)
+      end
+    end
+
     class Marker < Base
       attr_reader :name
 

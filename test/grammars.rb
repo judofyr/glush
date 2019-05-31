@@ -122,5 +122,18 @@ module TestGrammars
       expr
     }
   end
+
+  def utf8
+    @utf8 ||= Glush::Grammar.new {
+      rule \
+      def main
+        str("i") >> anyutf8 >> anyutf8 |
+        str("a") >> anyascii |
+        str("b") >> anytoken
+      end
+
+      main
+    }
+  end
 end
 

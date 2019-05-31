@@ -6,6 +6,7 @@ Glush is a versaile parser toolkit based on Glushkov's construction algorithm:
 - Parses all context-free grammars (even the most ambiguous ones) in worst-case cubic time.
 - Scannerless: Works directly on characters (no lexer needed).
 - Streamable, push-based API: You give it one token at a time; fail-fast supported.
+- Supports matching UTF-8 characters.
 - Usable as a parser combinator library in Ruby.
 - Licensed under link:LICENSE.md[0BSD].
 
@@ -16,7 +17,6 @@ Planned features:
 - Non-consuming token pattern (i.e. word boundaries)
 - Token set/range pattern (i.e. `[a-zA-Z0-9]`)
 - Ambiguity error reporting
-- Handle UTF-8 properly
 - Reading EBNF grammar files
 - Generating JavaScript/C/Go parser
 

@@ -26,6 +26,21 @@ module Glush
         .reduce { |a, b| a >> b }
     end
 
+    def anytoken
+      Patterns::Any.new
+    end
+
+    def anyascii
+      Patterns::UTF8Char1.new.complete
+    end
+
+    def anyutf8
+      Patterns::UTF8Char1.new.complete |
+      Patterns::UTF8Char2.new.complete |
+      Patterns::UTF8Char3.new.complete |
+      Patterns::UTF8Char4.new.complete
+    end
+
     def eps
       Patterns::Eps.new
     end
