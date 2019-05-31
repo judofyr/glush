@@ -177,6 +177,10 @@ module Glush
         @name = name
       end
 
+      def match?(token)
+        true
+      end
+
       def copy
         Marker.new(@name)
       end

@@ -102,33 +102,38 @@ module Glush
         @rule_final_states[rule_mark] << state
 
         callers.each do |call_state|
-          @transitions[call_state.terminal].each do |next_terminal|
-            new_state = State.new(next_terminal, call_state.rule_offset, call_state.marks.add(rule_mark))
-            follow(new_state, token)
-          end
-        end
-      when Patterns::Marker
-        mark = Mark.new(state.terminal.name, @offset)
-        @transitions[state.terminal].each do |next_terminal|
-          new_state = State.new(next_terminal, state.rule_offset, state.marks.add(mark))
-          follow(new_state, token)
+          marks = call_state.marks.add(rule_mark)
+          follow_transitions(call_state.terminal, call_state.rule_offset, marks, token)
         end
       when :success
         @final_states << state
       else
+        marks = state.marks
+        if state.terminal.is_a?(Patterns::Marker)
+          mark = Mark.new(state.terminal.name, @offset)
+          marks = state.marks.add(mark)
+        end
+
         if state.terminal.match?(token)
-          next_terminals = @transitions[state.terminal]
           if state.terminal.static?
-            next_terminals.each do |next_terminal|
-              new_state = State.new(next_terminal, state.rule_offset, state.marks)
-              follow(new_state, token)
-            end
+            follow_transitions(state.terminal, state.rule_offset, marks, token)
           else
-            next_terminals.each do |next_terminal|
-              @next_states << State.new(next_terminal, state.rule_offset, state.marks)
-            end
+            accept_transitions(state.terminal, state.rule_offset, marks)
           end
         end
+      end
+    end
+
+    def follow_transitions(terminal, rule_offset, marks, token)
+      @transitions[terminal].each do |next_terminal|
+        new_state = State.new(next_terminal, rule_offset, marks)
+        follow(new_state, token)
+      end
+    end
+
+    def accept_transitions(terminal, rule_offset, marks)
+      @transitions[terminal].each do |next_terminal|
+        @next_states << State.new(next_terminal, rule_offset, marks)
       end
     end
 
