@@ -173,5 +173,15 @@ class TestParser < Minitest::Spec
     # Bytes
     assert_recognize ["b", 0xFF].pack("aC*")
   end
+
+  describe(:comments) do
+    let(:grammar) { TestGrammars.comments }
+
+    assert_recognize "aa"
+    assert_recognize "a#\n"
+    assert_recognize "a#anything!🎉\naa"
+    assert_recognize "a#anything!🎉\na#more\n"
+    refute_recognize "a#"
+  end
 end
 

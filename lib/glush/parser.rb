@@ -117,8 +117,16 @@ module Glush
         @final_states << state
       else
         if state.terminal.match?(token)
-          @transitions[state.terminal].each do |next_terminal|
-            @next_states << State.new(next_terminal, state.rule_offset, state.marks)
+          next_terminals = @transitions[state.terminal]
+          if state.terminal.static?
+            next_terminals.each do |next_terminal|
+              new_state = State.new(next_terminal, state.rule_offset, state.marks)
+              follow(new_state, token)
+            end
+          else
+            next_terminals.each do |next_terminal|
+              @next_states << State.new(next_terminal, state.rule_offset, state.marks)
+            end
           end
         end
       end

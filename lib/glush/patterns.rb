@@ -219,6 +219,40 @@ module Glush
       end
     end
 
+    class NegativeToken < Base
+      attr_reader :name
+
+      def initialize(tokens)
+        if !tokens.is_a?(Array)
+          raise TypeError, "expected Array, got #{tokens.class}"
+        end
+
+        @tokens = tokens
+      end
+
+      def copy
+        NegativeToken.new(@tokens)
+      end
+
+      def calculate_empty(b)
+        @is_empty = false
+      end
+
+      def match?(token)
+        !@tokens.include?(token)
+      end
+
+      def static?
+        true
+      end
+
+      include Terminal
+
+      def inspect
+        "neg(#{@tokens.map(&:inspect).join(", ")})"
+      end
+    end
+
     class Alt < Base
       def initialize(left, right)
         @left = left.consume!

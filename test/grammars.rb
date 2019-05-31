@@ -135,5 +135,20 @@ module TestGrammars
       main
     }
   end
+
+  def comments
+    @comments ||= Glush::Grammar.new {
+      def comment
+        str("#") >> utf8inv("\n").star >> str("\n")
+      end
+
+      rule \
+      def main
+        (str("a") >> comment.maybe).star
+      end
+
+      main
+    }
+  end
 end
 

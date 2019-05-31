@@ -20,12 +20,6 @@ module Glush
       @start_call.rule.body.empty?
     end
 
-    def str(text)
-      text.bytes
-        .map { |c| Patterns::Token.new(c) }
-        .reduce { |a, b| a >> b }
-    end
-
     def anytoken
       Patterns::Any.new
     end
@@ -39,6 +33,32 @@ module Glush
       Patterns::UTF8Char2.new.complete |
       Patterns::UTF8Char3.new.complete |
       Patterns::UTF8Char4.new.complete
+    end
+
+    def negtoken(tokens)
+      Patterns::NegativeToken.new(tokens)
+    end
+
+    def token(token)
+      Patterns::Token.new(token)
+    end
+
+    def str(text)
+      text.bytes
+        .map { |c| token(c) }
+        .reduce { |a, b| a >> b }
+    end
+
+    def utf8inv(str)
+      tokens = str.chars.map do |char|
+        if char.bytesize > 1
+          raise GrammarError, "inverse multi-byte UTF-8 not supported"
+        end
+
+        char.ord
+      end
+
+      negtoken(tokens) >> anyutf8
     end
 
     def eps
