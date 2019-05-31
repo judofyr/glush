@@ -59,19 +59,19 @@ module Glush
       end
     end
 
-    class Char < Base
-      attr_reader :char
+    class Token < Base
+      attr_reader :token
 
-      def initialize(char)
-        @char = char
+      def initialize(token)
+        @token = token
       end
 
-      def match?(char)
-        @char == char
+      def match?(token)
+        @token == token
       end
 
       def copy
-        Char.new(@char)
+        Token.new(@token)
       end
 
       def calculate_empty(b)
@@ -81,7 +81,7 @@ module Glush
       include Terminal
 
       def inspect
-        "[#{@char}]"
+        "[#{@token}]"
       end
     end
 

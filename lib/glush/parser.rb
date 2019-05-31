@@ -46,7 +46,7 @@ module Glush
     end
 
     def push_string(input)
-      input.each_char { |char| self << char }
+      input.each_byte { |byte| self << byte }
     end
 
     def close

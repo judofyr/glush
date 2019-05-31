@@ -21,8 +21,8 @@ module Glush
     end
 
     def str(text)
-      text.chars
-        .map { |c| Patterns::Char.new(c) }
+      text.bytes
+        .map { |c| Patterns::Token.new(c) }
         .reduce { |a, b| a >> b }
     end
 
