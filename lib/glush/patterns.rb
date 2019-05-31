@@ -4,7 +4,7 @@ module Glush
       attr_accessor :is_empty
 
       def consume!
-        return copy.consume! if @consumed
+        return copy.consume! if defined?(@consumed)
         @consumed = true
         self
       end

@@ -54,6 +54,7 @@ module Glush
       old = method(name)
       rule = Patterns::Rule.new(name.to_s) { old.call }
       @rules << rule
+      singleton_class.send(:remove_method, name)
       define_singleton_method(name) { rule.call }
       nil
     end
