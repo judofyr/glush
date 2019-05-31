@@ -1,6 +1,6 @@
 = Glush: A parser toolkit
 
-Glush is a versaile parser toolkit based on Glushkov's construction algorithm:
+Glush is a versatile parser toolkit based on Glushkov's construction algorithm:
 
 - Parses LL/LR grammars in linear time.
 - Parses all context-free grammars (even the most ambiguous ones) in worst-case cubic time.
