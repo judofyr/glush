@@ -19,15 +19,6 @@ module Glush
 
       def initialize
         @contexts = []
-        @followed = false
-      end
-
-      def try_follow
-        if @followed
-          false
-        else
-          @followed = true
-        end
       end
 
       def add_context(context)
@@ -42,15 +33,6 @@ module Glush
       def initialize
         @rule_results = []
         @left_contexts = []
-        @followed = false
-      end
-
-      def try_follow
-        if @followed
-          false
-        else
-          @followed = true
-        end
       end
 
       def add_rule_result(result)
@@ -68,7 +50,7 @@ module Glush
       @states = []
       @states << State.new(@grammar.start_call, -1, List.empty)
       @states << State.new(:success, -1, List.empty) if @grammar.empty?
-      @callers = {}
+      @callers = Hash.new { |h, k| h[k] = [] }
 
       @transitions = @grammar.transitions
     end
@@ -115,20 +97,15 @@ module Glush
         rule = state.terminal.rule
         key = [rule, @offset]
 
-        if !@callers.has_key?(key)
-          callers = @callers[key] = []
-          first_call = true
-        else
-          callers = @callers[key]
-        end
-
+        is_executed = @callers.has_key?(key)
+        callers = @callers[key]
         callers << state
 
-        if first_call
-          rule.body.first_set.each do |fst_terminal|
-            new_state = State.new(fst_terminal, @offset, List.empty)
-            follow(new_state, token)
-          end
+        return if is_executed
+
+        rule.body.first_set.each do |fst_terminal|
+          new_state = State.new(fst_terminal, @offset, List.empty)
+          follow(new_state, token)
         end
       when Patterns::Rule
         rule = state.terminal
@@ -139,14 +116,16 @@ module Glush
 
         rule_span = RuleSpan.new(rule, state.rule_offset)
 
+        is_executed = @rule_results.has_key?(rule_span)
         rule_result = @rule_results[rule_span]
         rule_result.add_context(state.context)
 
-        return if !rule_result.try_follow
+        return if is_executed
 
         grouped = callers.group_by { |x| CallPos.new(x.terminal, x.rule_offset) }
 
         grouped.each do |pos, call_states|
+          is_executed = @call_results.has_key?(pos)
           call_result = @call_results[pos]
           call_result.add_rule_result(rule_result)
 
@@ -154,7 +133,7 @@ module Glush
             call_result.add_left_context(call_state.context)
           end
 
-          next if !call_result.try_follow
+          next if is_executed
 
           context = List[call_result]
           follow_transitions(pos.call, pos.rule_offset, context, token)
