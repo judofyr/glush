@@ -9,10 +9,10 @@ module Glush
     Mark = Struct.new(:name, :offset)
 
     # Represents a span where a rule was successfully completed
-    RuleSpan = Struct.new(:rule, :left_offset, :right_offset)
+    RuleSpan = Struct.new(:rule, :left_offset)
 
     # Represents a position where a call was successfully completed
-    CallPos = Struct.new(:call, :rule_offset, :right_offset)
+    CallPos = Struct.new(:call, :rule_offset)
 
     class RuleResult
       attr_reader :contexts
@@ -70,9 +70,6 @@ module Glush
       @states << State.new(:success, -1, List.empty) if @grammar.empty?
       @callers = {}
 
-      @rule_results = Hash.new { |h, k| h[k] = RuleResult.new }
-      @call_results = Hash.new { |h, k| h[k] = CallResult.new }
-
       @transitions = @grammar.transitions
     end
 
@@ -96,6 +93,9 @@ module Glush
     end
 
     def <<(token)
+      @rule_results = Hash.new { |h, k| h[k] = RuleResult.new }
+      @call_results = Hash.new { |h, k| h[k] = CallResult.new }
+
       @next_states = []
       @followed_states = Set.new
       @final_states = []
@@ -137,14 +137,14 @@ module Glush
         # Freeze here to verify that no more callers will add themselves
         callers = @callers[key].freeze
 
-        rule_span = RuleSpan.new(rule, state.rule_offset, @offset)
+        rule_span = RuleSpan.new(rule, state.rule_offset)
 
         rule_result = @rule_results[rule_span]
         rule_result.add_context(state.context)
 
         return if !rule_result.try_follow
 
-        grouped = callers.group_by { |x| CallPos.new(x.terminal, x.rule_offset, @offset) }
+        grouped = callers.group_by { |x| CallPos.new(x.terminal, x.rule_offset) }
 
         grouped.each do |pos, call_states|
           call_result = @call_results[pos]
