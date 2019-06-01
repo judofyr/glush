@@ -20,7 +20,7 @@ end
 
 class APerf < Perf
   def self.range
-    (60..120).step(5)
+    (30..80).step(5)
   end
   
   def self.build(n)

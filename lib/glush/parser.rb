@@ -1,40 +1,78 @@
 module Glush
   class Parser
-    State = Struct.new(:terminal, :rule_offset, :marks) do
+    State = Struct.new(:terminal, :rule_offset, :context) do
       def inspect
         "State(#{terminal.inspect} at #{rule_offset})"
       end
     end
 
-    class MarkList
-      def self.empty
-        @empty ||= new
+    Mark = Struct.new(:name, :offset)
+
+    # Represents a span where a rule was successfully completed
+    RuleSpan = Struct.new(:rule, :left_offset, :right_offset)
+
+    # Represents a position where a call was successfully completed
+    CallPos = Struct.new(:call, :rule_offset, :right_offset)
+
+    class RuleResult
+      attr_reader :contexts
+
+      def initialize
+        @contexts = []
+        @followed = false
       end
 
-      def initialize(marks = [])
-        @marks = marks
+      def try_follow
+        if @followed
+          false
+        else
+          @followed = true
+        end
       end
 
-      def add(mark)
-        MarkList.new(@marks + [mark])
-      end
-
-      def each(&blk)
-        @marks.each(&blk)
+      def add_context(context)
+        @contexts << context
       end
     end
 
-    Mark = Struct.new(:name, :offset)
-    RuleMark = Struct.new(:rule, :left_offset, :right_offset)
+    class CallResult
+      attr_reader :rule_results
+      attr_reader :left_contexts
+
+      def initialize
+        @rule_results = []
+        @left_contexts = []
+        @followed = false
+      end
+
+      def try_follow
+        if @followed
+          false
+        else
+          @followed = true
+        end
+      end
+
+      def add_rule_result(result)
+        @rule_results << result
+      end
+
+      def add_left_context(context)
+        @left_contexts << context
+      end
+    end
 
     def initialize(grammar)
       @grammar = grammar
       @offset = 0
       @states = []
-      @states << State.new(@grammar.start_call, -1, MarkList.empty)
-      @states << State.new(:success, -1, MarkList.empty) if @grammar.empty?
+      @states << State.new(@grammar.start_call, -1, List.empty)
+      @states << State.new(:success, -1, List.empty) if @grammar.empty?
       @callers = {}
-      @rule_final_states = Hash.new { |h, k| h[k] = [] }
+
+      @rule_results = Hash.new { |h, k| h[k] = RuleResult.new }
+      @call_results = Hash.new { |h, k| h[k] = CallResult.new }
+
       @transitions = @grammar.transitions
     end
 
@@ -88,77 +126,96 @@ module Glush
 
         if first_call
           rule.body.first_set.each do |fst_terminal|
-            new_state = State.new(fst_terminal, @offset, MarkList.empty)
+            new_state = State.new(fst_terminal, @offset, List.empty)
             follow(new_state, token)
           end
         end
       when Patterns::Rule
         rule = state.terminal
         key = [rule, state.rule_offset]
-        callers = @callers[key]
-        callers.freeze
 
-        rule_mark = RuleMark.new(rule, state.rule_offset, @offset)
-        @rule_final_states[rule_mark] << state
+        # Freeze here to verify that no more callers will add themselves
+        callers = @callers[key].freeze
 
-        callers.each do |call_state|
-          marks = call_state.marks.add(rule_mark)
-          follow_transitions(call_state.terminal, call_state.rule_offset, marks, token)
+        rule_span = RuleSpan.new(rule, state.rule_offset, @offset)
+
+        rule_result = @rule_results[rule_span]
+        rule_result.add_context(state.context)
+
+        return if !rule_result.try_follow
+
+        grouped = callers.group_by { |x| CallPos.new(x.terminal, x.rule_offset, @offset) }
+
+        grouped.each do |pos, call_states|
+          call_result = @call_results[pos]
+          call_result.add_rule_result(rule_result)
+
+          call_states.each do |call_state|
+            call_result.add_left_context(call_state.context)
+          end
+
+          next if !call_result.try_follow
+
+          context = List[call_result]
+          follow_transitions(pos.call, pos.rule_offset, context, token)
         end
       when :success
         @final_states << state
       else
-        marks = state.marks
+        context = state.context
         if state.terminal.is_a?(Patterns::Marker)
           mark = Mark.new(state.terminal.name, @offset)
-          marks = state.marks.add(mark)
+          context = context.add(mark)
         end
 
         if state.terminal.match?(token)
           if state.terminal.static?
-            follow_transitions(state.terminal, state.rule_offset, marks, token)
+            follow_transitions(state.terminal, state.rule_offset, context, token)
           else
-            accept_transitions(state.terminal, state.rule_offset, marks)
+            accept_transitions(state.terminal, state.rule_offset, context)
           end
         end
       end
     end
 
-    def follow_transitions(terminal, rule_offset, marks, token)
+    def follow_transitions(terminal, rule_offset, context, token)
       @transitions[terminal].each do |next_terminal|
-        new_state = State.new(next_terminal, rule_offset, marks)
+        new_state = State.new(next_terminal, rule_offset, context)
         follow(new_state, token)
       end
     end
 
-    def accept_transitions(terminal, rule_offset, marks)
+    def accept_transitions(terminal, rule_offset, context)
       @transitions[terminal].each do |next_terminal|
-        @next_states << State.new(next_terminal, rule_offset, marks)
+        @next_states << State.new(next_terminal, rule_offset, context)
       end
     end
 
     ## Marks
-    def each_flat_mark(states = @final_states, &blk)
-      if states.size != 1
+    def each_mark(contexts = @final_states.map(&:context), &blk)
+      if contexts.size != 1
         raise "ambigious"
       end
 
-      states[0].marks.each do |mark|
-        case mark
+      contexts[0].each do |item|
+        case item
         when Mark
-          yield mark
-        when RuleMark
-          rule_states = @rule_final_states.fetch(mark)
-          each_flat_mark(rule_states, &blk)
+          yield item
+        when CallResult
+          each_mark(item.left_contexts, &blk)
+          rule_contexts = item.rule_results.flat_map { |r| r.contexts }
+          each_mark(rule_contexts, &blk)
+        else
+          raise "Unknown class: #{mark.class}"
         end
       end
 
       self
     end
 
-    def flat_marks(states = @final_states)
+    def flat_marks
       result = []
-      each_flat_mark do |mark|
+      each_mark do |mark|
         result << mark
       end
       result
