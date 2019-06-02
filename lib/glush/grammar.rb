@@ -87,43 +87,66 @@ module Glush
 
     def rule(name)
       old = method(name)
-      rule = Patterns::Rule.new(name.to_s) { old.call }
-      @rules << rule
+      rule = _new_rule(name.to_s) { old.call }
       singleton_class.send(:remove_method, name)
       define_singleton_method(name) { rule.call }
       nil
     end
 
     class PrecBuilder
-      def initialize(level)
-        @level = level
-        @alternatives = []
-      end
-
-      def add(pattern_level, pattern)
-        if @level <= pattern_level
-          @alternatives << pattern
+      def initialize(grammar, name)
+        @alternatives = Hash.new { |h, k| h[k] = [] }
+        @rules = Hash.new do |h, level|
+          h[level] = grammar._new_rule("#{name}^#{level}") { pattern_for(level) }
         end
       end
 
-      def finalize
-        raise GrammarError, "invalid precedence level: #{@level}" if @alternatives.empty?
-        @alternatives.reduce { |a, b| a | b }
+      def add(pattern_level, &blk)
+        @alternatives[pattern_level] << blk
+        self
+      end
+
+      def levels
+        @levels ||= @alternatives.keys.sort
+      end
+
+      def pattern_for(level)
+        pattern = @alternatives[level].map(&:call).reduce { |a, b| a | b }
+
+        if next_level = levels.detect { |l| l > level }
+          pattern |= call_for(next_level)
+        end
+
+        pattern
+      end
+
+      def resolve_level(level)
+        level = 0 if level.nil?
+        actual_level = levels.detect { |l| l >= level }
+        if !actual_level
+          raise GrammarError, "unknown precedence level: #{level}"
+        end
+        actual_level
+      end
+
+      def call_for(level)
+        @rules[level].call
       end
     end
 
-    def prec_rule(name)
-      rules = Hash.new do |h, level|
-        rule = Patterns::Rule.new("#{name}^#{level}") do
-          builder = PrecBuilder.new(level)
-          yield builder
-          builder.finalize
-        end
-        @rules << rule
-        h[level] = rule
-      end
+    def prec_rule(name, &blk)
+      builder = PrecBuilder.new(self, name)
+      yield builder
 
-      define_singleton_method(name) { |level=0| rules[level].call }
+      define_singleton_method(name) do |level=nil|
+        level = builder.resolve_level(level)
+        builder.call_for(level)
+      end
+    end
+
+    def _new_rule(name, &blk)
+      Patterns::Rule.new(name, &blk)
+        .tap { |rule| @rules << rule }
     end
 
     private

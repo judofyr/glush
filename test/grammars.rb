@@ -126,12 +126,12 @@ module TestGrammars
   def prec_expr
     @prec_expr ||= Glush::Grammar.new {
       prec_rule :expr do |prec|
-        prec.add 10, mark(:n) >> str("n")
-        prec.add 1, mark(:add) >> expr(1) >> str("+") >> expr(2)
-        prec.add 1, mark(:sub) >> expr(1) >> str("-") >> expr(2)
-        prec.add 2, mark(:mul) >> expr(2) >> str("*") >> expr(3)
-        prec.add 2, mark(:div) >> expr(2) >> str("/") >> expr(3)
-        prec.add 3, mark(:pow) >> expr(4) >> str("^") >> expr(3)
+        prec.add(9) { mark(:n) >> str("n") }
+        prec.add(1) { mark(:add) >> expr(1) >> str("+") >> expr(2) }
+        prec.add(1) { mark(:sub) >> expr(1) >> str("-") >> expr(2) }
+        prec.add(2) { mark(:mul) >> expr(2) >> str("*") >> expr(3) }
+        prec.add(2) { mark(:div) >> expr(2) >> str("/") >> expr(3) }
+        prec.add(3) { mark(:pow) >> expr(4) >> str("^") >> expr(3) }
       end
 
       expr
