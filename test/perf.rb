@@ -65,10 +65,17 @@ class ManExpr < Expr
   end
 end
 
+class PrecExpr < ManExpr
+  def self.grammar
+    TestGrammars.prec_expr
+  end
+end
+
 runners = {
   "a" => APerf,
   "ambexpr" => AmbExpr,
   "manexpr" => ManExpr,
+  "precexpr" => PrecExpr,
 }
 
 if runner = runners[ARGV[0]]
