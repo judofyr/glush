@@ -39,9 +39,9 @@ class Expr < Perf
     ops = OPS.cycle
     str = String.new
     n.times do
-      str << "1#{ops.next}"
+      str << "n#{ops.next}"
     end
-    str << "1"
+    str << "n"
   end
 end
 

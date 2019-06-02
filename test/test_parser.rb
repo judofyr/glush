@@ -69,30 +69,30 @@ class TestParser < Minitest::Spec
   describe(:amb_expr) do
     let(:grammar) { TestGrammars.amb_expr }
 
-    assert_recognize "1"
-    assert_recognize "1+1"
-    assert_recognize "1+1*1/1-1*1-1"
-    refute_recognize "1+1*1/1-11-1"
+    assert_recognize "n"
+    assert_recognize "n+n"
+    assert_recognize "n+n*n/n-n*n-n"
+    refute_recognize "n+n*n/n-nn-n"
   end
 
   describe(:manual_expr) do
     let(:grammar) { TestGrammars.manual_expr }
 
-    assert_recognize "1"
-    assert_recognize "1+1"
-    assert_recognize "1+1*1/1-1*1-1"
-    refute_recognize "1+1*1/1-11-1"
+    assert_recognize "n"
+    assert_recognize "n+n"
+    assert_recognize "n+n*n/n-n*n-n"
+    refute_recognize "n+n*n/n-nn-n"
 
-    assert_marks "1", [[:one, 0]]
-    assert_marks "1+1", [[:add, 0], [:one, 0], [:one, 2]]
-    assert_marks "1+1*1+1", [
+    assert_marks "n", [[:n, 0]]
+    assert_marks "n+n", [[:add, 0], [:n, 0], [:n, 2]]
+    assert_marks "n+n*n+n", [
       [:add, 0],
         [:add, 0],
-          [:one, 0],
+          [:n, 0],
           [:mul, 2],
-            [:one, 2],
-            [:one, 4],
-        [:one, 6]
+            [:n, 2],
+            [:n, 4],
+        [:n, 6]
     ]
   end
 

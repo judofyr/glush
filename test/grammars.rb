@@ -88,7 +88,7 @@ module TestGrammars
         expr >> str("-") >> expr |
         expr >> str("*") >> expr |
         expr >> str("/") >> expr |
-        str("1")
+        str("n")
       end
 
       expr
@@ -112,7 +112,7 @@ module TestGrammars
       end
 
       def base
-        mark(:one) >> str("1")
+        mark(:n) >> str("n")
       end
 
       def expr
