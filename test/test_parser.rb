@@ -22,6 +22,7 @@ class TestParser < Minitest::Spec
       parser = Glush::Parser.new(grammar)
       parser.push_string(input)
       parser.close
+      assert parser.final?, "expected match for input: #{input}"
       assert_equal parser.flat_marks.map(&:to_a), marks
     end
   end
@@ -201,6 +202,37 @@ class TestParser < Minitest::Spec
     refute_recognize "aa"
     assert_recognize "aaa"
     refute_recognize "aaaa"
+  end
+
+  describe("precedence") do
+    let(:grammar) { TestGrammars.prec_expr }
+
+    assert_recognize "n"
+    assert_recognize "n+n"
+    assert_recognize "n+n+n"
+    assert_marks "n+n+n", [
+      [:add, 0],
+        [:add, 0],
+          [:n, 0],
+          [:n, 2],
+        [:n, 4],
+    ]
+
+    assert_marks "n+n-n", [
+      [:sub, 0],
+        [:add, 0],
+          [:n, 0],
+          [:n, 2],
+        [:n, 4],
+    ]
+
+    assert_marks "n^n^n", [
+      [:pow, 0],
+        [:n, 0],
+        [:pow, 2],
+          [:n, 2],
+          [:n, 4],
+    ]
   end
 end
 

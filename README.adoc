@@ -7,13 +7,13 @@ Glush is a versatile parser toolkit based on Glushkov's construction algorithm:
 - Scannerless: Works directly on characters (no lexer needed).
 - Streamable, push-based API: You give it one token at a time; fail-fast supported.
 - Supports matching UTF-8 characters.
+- Flexible operator precedence.
 - Usable as a parser combinator library in Ruby.
 - Licensed under link:LICENSE.md[0BSD].
 
 Planned features:
 
 - Documentation
-- Operator precedence handling
 - Token set/range pattern (i.e. `[a-zA-Z0-9]`)
 - Ambiguity error reporting
 - Reading EBNF grammar files

@@ -94,6 +94,38 @@ module Glush
       nil
     end
 
+    class PrecBuilder
+      def initialize(level)
+        @level = level
+        @alternatives = []
+      end
+
+      def add(pattern_level, pattern)
+        if @level <= pattern_level
+          @alternatives << pattern
+        end
+      end
+
+      def finalize
+        raise GrammarError, "invalid precedence level: #{@level}" if @alternatives.empty?
+        @alternatives.reduce { |a, b| a | b }
+      end
+    end
+
+    def prec_rule(name)
+      rules = Hash.new do |h, level|
+        rule = Patterns::Rule.new("#{name}^#{level}") do
+          builder = PrecBuilder.new(level)
+          yield builder
+          builder.finalize
+        end
+        @rules << rule
+        h[level] = rule
+      end
+
+      define_singleton_method(name) { |level=0| rules[level].call }
+    end
+
     private
 
     def _compute_empty
