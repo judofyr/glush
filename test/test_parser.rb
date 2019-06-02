@@ -183,5 +183,24 @@ class TestParser < Minitest::Spec
     assert_recognize "a#anything!🎉\na#more\n"
     refute_recognize "a#"
   end
+
+  describe("re-used patterns") do
+    let(:grammar) do
+      Glush::Grammar.new {
+        rule \
+        def main
+          foo = str("a")
+          foo >> foo >> foo
+        end
+
+        main
+      }
+    end
+
+    refute_recognize "a"
+    refute_recognize "aa"
+    assert_recognize "aaa"
+    refute_recognize "aaaa"
+  end
 end
 
