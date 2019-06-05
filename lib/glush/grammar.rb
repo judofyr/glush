@@ -166,17 +166,14 @@ module Glush
 
     def _compute_transitions
       @transitions = Hash.new { |h, k| h[k] = [] }
-      @owners = {}
 
       @rules.each do |rule|
         rule.body.each_pair do |a, b|
           @transitions[a] << b
-          @owners[a] = @owners[b] = rule
         end
 
         rule.body.last_set.each do |lst|
           @transitions[lst] << rule
-          @owners[lst] = rule
         end
 
         if !rule.body.empty? && rule.body.static?
