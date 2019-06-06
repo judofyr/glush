@@ -124,5 +124,16 @@ class TestEBNF < Minitest::Spec
     assert_marks ":n+n", [[:add, 1], [:n, 1], [:n, 3]]
     assert_marks ":n+n*n", [[:add, 1], [:n, 1], [:mul, 3], [:n, 3], [:n, 5]]
   end
+
+  describe("extra |") do
+    let(:ebnf) { %{
+      S =
+        | 'a'
+        | 'b'
+    } }
+
+    assert_matches "a"
+    assert_matches "b"
+  end
 end
 

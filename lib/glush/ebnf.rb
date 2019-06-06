@@ -2,7 +2,7 @@ module Glush
   class EBNF
     Grammar = ::Glush::Grammar.new {
       def_rule :ebnf_rule do
-        mark(:rule) >> ident >> ign >> ebnf_rule_sep >> ign >> ebnf_pattern |
+        mark(:rule) >> ident >> ign >> ebnf_rule_sep >> ign >> (str("|") >> ign).maybe >> ebnf_pattern |
         mark(:prec_rule) >> ident >> ign >> ebnf_rule_sep >> ign >> ebnf_prec_branches
       end
 
