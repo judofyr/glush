@@ -5,15 +5,18 @@ module Glush
     def initialize(&blk)
       @rules = []
 
-      result = instance_eval(&blk)
-      if !result.is_a?(Patterns::RuleCall)
-        raise "block must return a rule call"
+      finalize(instance_eval(&blk)) if block_given?
+    end
+
+    def finalize(start_call)
+      if !start_call.is_a?(Patterns::RuleCall)
+        raise TypeError, "the main pattern must be a rule call"
       end
 
-      @start_call = result.consume!
-
+      @start_call = start_call.consume!
       _compute_empty
       _compute_transitions
+      self
     end
 
     def empty?
@@ -44,9 +47,41 @@ module Glush
     end
 
     def str(text)
-      text.bytes
-        .map { |c| token(c) }
-        .reduce { |a, b| a >> b }
+      case text
+      when String
+        text.bytes
+          .map { |c| token(c) }
+          .reduce { |a, b| a >> b }
+      when Range
+        a = text.begin
+        b = text.end
+
+        if a.size != 1 || b.size != 1
+          raise GrammarError, "only single-character supported in range"
+        end
+
+        a_num = a.ord
+        b_num = b.ord
+
+        if b_num < a_num
+          raise GrammarError, "invalid range"
+        end
+
+        token(a_num..b_num)
+      else
+        raise GrammarError, "unsupported type: #{text.inspect}"
+      end
+    end
+
+    def inv(pattern)
+      case pattern
+      when Patterns::Token
+        token(valid_tokens - pattern.tokens)
+      when Patterns::Alt
+        inv(pattern.left) & inv(pattern.right)
+      else
+        raise GrammarError, "cannot inverse #{pattern.inspect}"
+      end
     end
 
     def utf8inv(str)
@@ -65,7 +100,7 @@ module Glush
       Patterns::Eps.new
     end
 
-    def mark(name)
+    def mark(name = :mark)
       Patterns::Marker.new(name)
     end
 

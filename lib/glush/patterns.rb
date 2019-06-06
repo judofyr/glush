@@ -64,6 +64,8 @@ module Glush
     end
 
     class Token < Base
+      attr_reader :tokens
+
       def initialize(token)
         @tokens = Array(token)
       end
@@ -76,6 +78,14 @@ module Glush
         Token.new(@tokens)
       end
 
+      def &(other)
+        if other.is_a?(Token)
+          Token.new(@tokens & other.tokens)
+        else
+          super
+        end
+      end
+
       def calculate_empty(b)
         @is_empty = false
       end
@@ -83,7 +93,7 @@ module Glush
       include Terminal
 
       def inspect
-        "token(#{@token.inspect})"
+        "token(#{@tokens.inspect})"
       end
     end
 
@@ -217,11 +227,21 @@ module Glush
         EMPTY_SET
       end
 
+      def static?
+        false
+      end
+
       def each_pair
+      end
+
+      def inspect
+        "eps"
       end
     end
 
     class Alt < Base
+      attr_reader :left, :right
+
       def initialize(left, right)
         @left = left.consume!
         @right = right.consume!
@@ -250,6 +270,10 @@ module Glush
       def each_pair(&blk)
         @left.each_pair(&blk)
         @right.each_pair(&blk)
+      end
+
+      def inspect
+        "alt(#{@left.inspect}, #{@right.inspect})"
       end
     end
 
@@ -288,6 +312,10 @@ module Glush
             yield a, b
           end
         end
+      end
+
+      def inspect
+        "seq(#{@left.inspect}, #{@right.inspect})"
       end
     end
 
@@ -361,6 +389,10 @@ module Glush
             yield a, b
           end
         end
+      end
+
+      def inspect
+        "plus(#{@child.inspect})"
       end
     end
 
