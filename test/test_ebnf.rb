@@ -31,6 +31,15 @@ class TestEBNF < Minitest::Spec
     end
   end
 
+  def self.assert_marks(input, marks)
+    it "should match marks" do
+      grammar = Glush::EBNF.parse(ebnf)
+      result = Glush::Parser.parse_string(grammar, input)
+      assert result.valid?, "expected match for input: #{input}"
+      assert_equal result.marks.map(&:to_a), marks
+    end
+  end
+
   describe("simple ebnf") do
     let(:ebnf) { %{
       S = AB*
@@ -85,6 +94,17 @@ class TestEBNF < Minitest::Spec
     assert_matches "cd"
     assert_matches "c"
     refute_matches ""
+  end
+
+  describe("marks") do
+    let(:ebnf) { %{
+      S = (A | B)+
+      A = $foo 'a'
+      B = $bar 'b'
+    } }
+
+    assert_marks "aa", [[:foo, 0], [:foo, 1]]
+    assert_marks "ab", [[:foo, 0], [:bar, 1]]
   end
 end
 

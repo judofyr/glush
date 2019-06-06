@@ -35,6 +35,7 @@ module Glush
 
         p.add(10) { mark(:pident) >> ident }
         p.add(10) { mark(:pstring) >> ebnf_str }
+        p.add(10) { mark(:pmark) >> str("$") >> ident }
       end
 
       ## Whitespace
@@ -150,6 +151,11 @@ module Glush
       def process_pstring(mark)
         text = process
         @grammar.str(text)
+      end
+
+      def process_pmark(mark)
+        ident = process
+        @grammar.mark(ident.to_sym)
       end
 
       def process_group(mark)
