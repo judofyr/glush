@@ -252,5 +252,26 @@ class TestParser < Minitest::Spec
     assert_recognize "aabbcc"
     refute_recognize "aabbc"
   }
+
+  describe("guards") {
+    let(:grammar) {
+      Glush::Grammar.new {
+        def_rule :ident, guard: utf8inv("a") do
+          str("a").plus
+        end
+
+        def_rule :s do
+          ident |
+          ident >> str(" ").star >> ident
+        end
+
+        s
+      }
+    }
+
+    assert_marks "a", []
+    assert_marks "aa", []
+    assert_marks "aa aa", []
+  }
 end
 

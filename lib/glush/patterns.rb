@@ -365,12 +365,20 @@ module Glush
     end
 
     class Rule
-      attr_reader :name, :calls
+      attr_reader :name, :calls, :guard
 
       def initialize(name, &blk)
         @name = name
         @code = blk
         @calls = []
+      end
+
+      def guard=(pattern)
+        if !pattern.is_a?(Token)
+          raise TypeError, "only Token pattern can be used as guard" 
+        end
+
+        @guard = pattern
       end
 
       def call

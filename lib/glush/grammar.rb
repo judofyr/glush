@@ -85,8 +85,9 @@ module Glush
       (p >> sep).plus
     end
 
-    def def_rule(name, &blk)
+    def def_rule(name, guard: nil, &blk)
       rule = _new_rule(name.to_s, &blk)
+      rule.guard = guard if guard
       define_singleton_method(name) { rule.call }
     end
 

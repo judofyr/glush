@@ -110,6 +110,14 @@ module Glush
         end
       when Patterns::Rule
         rule = state.terminal
+
+        if rule.guard
+          if token && !rule.guard.match?(token)
+            # Guard didn't match
+            return
+          end
+        end
+
         key = [rule, state.rule_offset]
 
         # Freeze here to verify that no more callers will add themselves
