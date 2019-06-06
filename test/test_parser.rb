@@ -99,14 +99,12 @@ class TestParser < Minitest::Spec
   it "should reject empty mark rules" do
     assert_raises Glush::GrammarError do
       g = Glush::Grammar.new {
-        rule \
-        def m
+        def_rule :m do
           mark(:empty) |
           mark(:non_empty) >> str("a")
         end
 
-        rule \
-        def main
+        def_rule :main do
           m | m >> str("a")
         end
 
@@ -120,13 +118,11 @@ class TestParser < Minitest::Spec
   it "should reject seq empty mark rules" do
     assert_raises Glush::GrammarError do
       g = Glush::Grammar.new {
-        rule \
-        def m
+        def_rule :m do
           mark(:empty) >> mark(:empty)
         end
 
-        rule \
-        def main
+        def_rule :main do
           m | m >> str("a")
         end
 
@@ -140,13 +136,11 @@ class TestParser < Minitest::Spec
   it "should reject many empty mark rules" do
     assert_raises Glush::GrammarError do
       g = Glush::Grammar.new {
-        rule \
-        def m
+        def_rule :m do
           mark(:empty).plus
         end
 
-        rule \
-        def main
+        def_rule :main do
           m | m >> str("a")
         end
 
@@ -188,8 +182,7 @@ class TestParser < Minitest::Spec
   describe("re-used patterns") do
     let(:grammar) do
       Glush::Grammar.new {
-        rule \
-        def main
+        def_rule :main do
           foo = str("a")
           foo >> foo >> foo
         end
@@ -238,19 +231,16 @@ class TestParser < Minitest::Spec
   describe("conj") {
     let(:grammar) {
       Glush::Grammar.new {
-        rule \
-        def s
+        def_rule :s do
           (str("a").plus >> b) &
           (a >> str("c").plus)
         end
 
-        rule \
-        def a
+        def_rule :a do
           str("a") >> a.maybe >> str("b")
         end
 
-        rule \
-        def b
+        def_rule :b do
           str("b") >> b.maybe >> str("c")
         end
 

@@ -85,12 +85,9 @@ module Glush
       (p >> sep).plus
     end
 
-    def rule(name)
-      old = method(name)
-      rule = _new_rule(name.to_s) { old.call }
-      singleton_class.send(:remove_method, name)
+    def def_rule(name, &blk)
+      rule = _new_rule(name.to_s, &blk)
       define_singleton_method(name) { rule.call }
-      nil
     end
 
     class PrecBuilder
