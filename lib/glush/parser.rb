@@ -44,12 +44,39 @@ module Glush
       end
     end
 
+    class ParseError
+      attr_reader :offset, :expected_tokens
+
+      def initialize(offset, expected_tokens)
+        @offset = offset
+        @expected_tokens = expected_tokens
+      end
+
+      def valid?
+        false
+      end
+    end
+
+    class ParseSuccess
+      def initialize(parser)
+        @parser = parser
+      end
+
+      def marks
+        @parser.flat_marks
+      end
+
+      def valid?
+        true
+      end
+    end
+
     def initialize(grammar)
       @grammar = grammar
       @offset = 0
-      @states = []
-      @states << State.new(@grammar.start_call, -1, List.empty)
-      @states << State.new(:success, -1, List.empty) if @grammar.empty?
+      @next_states = []
+      @next_states << State.new(@grammar.start_call, -1, List.empty)
+      @next_states << State.new(:success, -1, List.empty) if @grammar.empty?
       @callers = Hash.new { |h, k| h[k] = [] }
 
       @transitions = @grammar.transitions
@@ -60,6 +87,36 @@ module Glush
       parser.push_string(string)
       parser.close
       parser.final?
+    end
+
+    def self.parse_string(grammar, string)
+      new(grammar).parse_string(string)
+    end
+
+    def parse_string(input)
+      input.each_byte do |byte|
+        offset = @offset
+
+        self << byte
+
+        if @next_states.empty?
+          expected_tokens = @failed_terminals
+            .grep(Patterns::Token)
+            .reduce(Set.new) { |s, p| s.merge(p.tokens) }
+
+          return ParseError.new(offset, expected_tokens)
+        end
+      end
+
+      offset = @offset
+
+      close
+
+      if final?
+        ParseSuccess.new(self)
+      else
+        ParseError.new(offset, Set[nil])
+      end
     end
 
     def push_string(input)
@@ -78,14 +135,15 @@ module Glush
       @rule_results = Hash.new { |h, k| h[k] = RuleResult.new }
       @call_results = Hash.new { |h, k| h[k] = CallResult.new }
 
+      @states = @next_states
       @next_states = []
       @followed_states = Set.new
       @completed_conj = Hash.new { |h, k| h[k] = {} }
+      @failed_terminals = Set.new
       @final_states = []
       @states.each do |state|
         follow(state, token)
       end
-      @states = @next_states
       @offset += 1
     end
 
@@ -172,6 +230,8 @@ module Glush
       else
         if state.terminal.match?(token)
           accept_transitions(state.terminal, state.rule_offset, state.context)
+        else
+          @failed_terminals << state.terminal
         end
       end
     end

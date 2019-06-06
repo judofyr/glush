@@ -5,6 +5,10 @@ class TestParser < Minitest::Spec
     Glush::Parser.recognize_string?(grammar, input)
   end
 
+  def parse(grammar, input)
+    Glush::Parser.parse_string(grammar, input)
+  end
+
   def self.assert_recognize(input)
     it "should recognize" do
       assert recognize?(grammar, input), "expected match for input: #{input}"
@@ -272,6 +276,39 @@ class TestParser < Minitest::Spec
     assert_marks "a", []
     assert_marks "aa", []
     assert_marks "aa aa", []
+  }
+
+  describe("error reporting") {
+    let(:grammar) { TestGrammars.prec_expr }
+
+    it "report errors on n" do
+      result = parse(grammar, "n*n+n++n")
+      refute result.valid?
+      assert_equal 6, result.offset
+      assert_includes result.expected_tokens, "n".ord
+    end
+
+    it "report errors on ops" do
+      result = parse(grammar, "n*n+n +n")
+      refute result.valid?
+      assert_equal 5, result.offset
+      %w[+ - * /].each do |op|
+        assert_includes result.expected_tokens, op.ord
+      end
+    end
+
+    it "reports errors on eof" do
+      result = parse(grammar, "n*n+n+")
+      refute result.valid?
+      assert_equal 6, result.offset
+      assert_includes result.expected_tokens, nil
+    end
+
+    it "can extract marks from result" do
+      result = parse(grammar, "n*n")
+      assert result.valid?
+      assert result.marks
+    end
   }
 end
 
