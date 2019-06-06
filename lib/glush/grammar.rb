@@ -20,6 +20,10 @@ module Glush
       @start_call.rule.body.empty?
     end
 
+    def valid_tokens
+      @tokens ||= (0..255).to_a
+    end
+
     def anytoken
       Patterns::Any.new
     end
@@ -33,10 +37,6 @@ module Glush
       Patterns::UTF8Char2.new.complete |
       Patterns::UTF8Char3.new.complete |
       Patterns::UTF8Char4.new.complete
-    end
-
-    def negtoken(tokens)
-      Patterns::NegativeToken.new(tokens)
     end
 
     def token(token)
@@ -58,7 +58,7 @@ module Glush
         char.ord
       end
 
-      negtoken(tokens) >> anyutf8
+      token(valid_tokens - tokens)
     end
 
     def eps

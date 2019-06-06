@@ -157,19 +157,13 @@ module Glush
         if data[:left] && data[:right]
           follow_transitions(conj, state.rule_offset, data[:context], token)
         end
+      when Patterns::Marker
+        mark = Mark.new(state.terminal.name, @offset)
+        context = state.context.add(mark)
+        follow_transitions(state.terminal, state.rule_offset, context, token)
       else
-        context = state.context
-        if state.terminal.is_a?(Patterns::Marker)
-          mark = Mark.new(state.terminal.name, @offset)
-          context = context.add(mark)
-        end
-
         if state.terminal.match?(token)
-          if state.terminal.static?
-            follow_transitions(state.terminal, state.rule_offset, context, token)
-          else
-            accept_transitions(state.terminal, state.rule_offset, context)
-          end
+          accept_transitions(state.terminal, state.rule_offset, state.context)
         end
       end
     end

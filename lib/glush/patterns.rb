@@ -64,18 +64,16 @@ module Glush
     end
 
     class Token < Base
-      attr_reader :token
-
       def initialize(token)
-        @token = token
+        @tokens = Array(token)
       end
 
       def match?(token)
-        @token == token
+        @tokens.include?(token)
       end
 
       def copy
-        Token.new(@token)
+        Token.new(@tokens)
       end
 
       def calculate_empty(b)
@@ -85,7 +83,7 @@ module Glush
       include Terminal
 
       def inspect
-        "[#{@token}]"
+        "token(#{@token.inspect})"
       end
     end
 
@@ -181,10 +179,6 @@ module Glush
         @name = name
       end
 
-      def match?(token)
-        true
-      end
-
       def copy
         Marker.new(@name)
       end
@@ -224,40 +218,6 @@ module Glush
       end
 
       def each_pair
-      end
-    end
-
-    class NegativeToken < Base
-      attr_reader :name
-
-      def initialize(tokens)
-        if !tokens.is_a?(Array)
-          raise TypeError, "expected Array, got #{tokens.class}"
-        end
-
-        @tokens = tokens
-      end
-
-      def copy
-        NegativeToken.new(@tokens)
-      end
-
-      def calculate_empty(b)
-        @is_empty = false
-      end
-
-      def match?(token)
-        !@tokens.include?(token)
-      end
-
-      def static?
-        true
-      end
-
-      include Terminal
-
-      def inspect
-        "neg(#{@tokens.map(&:inspect).join(", ")})"
       end
     end
 

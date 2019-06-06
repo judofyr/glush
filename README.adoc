@@ -15,7 +15,6 @@ Glush is a versatile parser toolkit based on Glushkov's construction algorithm:
 Planned features:
 
 - Documentation
-- Token set/range pattern (i.e. `[a-zA-Z0-9]`)
 - Ambiguity error reporting
 - Reading EBNF grammar files
 - Generating JavaScript/C/Go parser
