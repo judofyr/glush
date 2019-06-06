@@ -80,6 +80,7 @@ module Glush
 
       @next_states = []
       @followed_states = Set.new
+      @completed_conj = Hash.new { |h, k| h[k] = {} }
       @final_states = []
       @states.each do |state|
         follow(state, token)
@@ -140,6 +141,22 @@ module Glush
         end
       when :success
         @final_states << state
+      when Patterns::Conj::Finalizer
+        finalizer = state.terminal
+        conj = finalizer.id
+        key = [conj, state.rule_offset]
+        data = @completed_conj[key]
+
+        if finalizer.type == :left
+          data[:left] = true
+          data[:context] = state.context
+        else
+          data[:right] = true
+        end
+
+        if data[:left] && data[:right]
+          follow_transitions(conj, state.rule_offset, data[:context], token)
+        end
       else
         context = state.context
         if state.terminal.is_a?(Patterns::Marker)

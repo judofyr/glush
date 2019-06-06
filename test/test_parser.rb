@@ -234,5 +234,33 @@ class TestParser < Minitest::Spec
           [:n, 4],
     ]
   end
+
+  describe("conj") {
+    let(:grammar) {
+      Glush::Grammar.new {
+        rule \
+        def s
+          (str("a").plus >> b) &
+          (a >> str("c").plus)
+        end
+
+        rule \
+        def a
+          str("a") >> a.maybe >> str("b")
+        end
+
+        rule \
+        def b
+          str("b") >> b.maybe >> str("c")
+        end
+
+        s
+      }
+    }
+
+    assert_recognize "abc"
+    assert_recognize "aabbcc"
+    refute_recognize "aabbc"
+  }
 end
 

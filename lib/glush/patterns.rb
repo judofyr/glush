@@ -25,6 +25,10 @@ module Glush
         Alt.new(self, other)
       end
 
+      def &(other)
+        Conj.new(self, other)
+      end
+
       def plus
         Plus.new(self)
       end
@@ -323,6 +327,44 @@ module Glush
           @right.first_set.each do |b|
             yield a, b
           end
+        end
+      end
+    end
+
+    class Conj < Base
+      Finalizer = Struct.new(:id, :type)
+
+      def initialize(left, right)
+        @left = left.consume!
+        @right = right.consume!
+      end
+
+      def calculate_empty(b)
+        @is_empty = @left.calculate_empty(b) & @right.calculate_empty(b)
+      end
+
+      def static?
+        @left.static? && @right.static?
+      end
+
+      def first_set
+        @first_set ||= @left.first_set | @right.first_set
+      end
+
+      def last_set
+        @last_set ||= Set[self]
+      end
+
+      def each_pair(&blk)
+        @left.each_pair(&blk)
+        @right.each_pair(&blk)
+
+        @left.last_set.each do |lst|
+          yield lst, Finalizer.new(self, :left)
+        end
+
+        @right.last_set.each do |lst|
+          yield lst, Finalizer.new(self, :right)
         end
       end
     end
