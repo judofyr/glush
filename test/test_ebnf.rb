@@ -106,5 +106,23 @@ class TestEBNF < Minitest::Spec
     assert_marks "aa", [[:foo, 0], [:foo, 1]]
     assert_marks "ab", [[:foo, 0], [:bar, 1]]
   end
+
+  describe("presedence") do
+    let(:ebnf) { %{
+      M = ":" S
+
+      S =
+       1| $add S^1 "+" S^2
+       1| $sub S^1 "-" S^2
+       2| $mul S^2 "*" S^3
+       2| $div S^2 "/" S^3
+       9| n
+
+      n = $n 'n'
+    } }
+
+    assert_marks ":n+n", [[:add, 1], [:n, 1], [:n, 3]]
+    assert_marks ":n+n*n", [[:add, 1], [:n, 1], [:mul, 3], [:n, 3], [:n, 5]]
+  end
 end
 

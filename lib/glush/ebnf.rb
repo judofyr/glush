@@ -2,7 +2,8 @@ module Glush
   class EBNF
     Grammar = ::Glush::Grammar.new {
       def_rule :ebnf_rule do
-        mark(:rule) >> ident >> ign >> ebnf_rule_sep >> ign >> ebnf_pattern
+        mark(:rule) >> ident >> ign >> ebnf_rule_sep >> ign >> ebnf_pattern |
+        mark(:prec_rule) >> ident >> ign >> ebnf_rule_sep >> ign >> ebnf_prec_branches
       end
 
       def ebnf_rule_sep
@@ -34,8 +35,16 @@ module Glush
         p.add(10) { mark(:star)  >> braced_pattern("{", "}") }
 
         p.add(10) { mark(:pident) >> ident }
+        p.add(10) { mark(:pident_level) >> ident >> str("^") >> number }
         p.add(10) { mark(:pstring) >> ebnf_str }
         p.add(10) { mark(:pmark) >> str("$") >> ident }
+      end
+
+      def_rule :ebnf_prec_branches do
+        sep_by1(
+          mark(:prec_branch) >> number >> str("|") >> ign >> ebnf_pattern,
+          ign
+        )
       end
 
       ## Whitespace
@@ -65,6 +74,10 @@ module Glush
         ident_fst | str("0".."9")
       end
 
+      def_rule :number do
+        mark(:number) >> str("0".."9").plus >> mark
+      end
+
       def_rule :ident, guard: inv(ident_rest) do
         mark(:ident) >> ident_fst >> ident_rest.star >> mark
       end
@@ -85,17 +98,28 @@ module Glush
         @index = 0
         @grammar = Glush::Grammar.new
 
-        @main_rule_name = nil
-        @rule_body = {}
-        @rules = Hash.new { |h, k|
-          h[k] = @grammar._new_rule(k) {
-            @rule_body.fetch(k)
-          }
-        }
+        @calls = Hash.new
+        @precs = Hash.new
+      end
+
+      def compile_pattern(ast)
+        return ast if ast.is_a?(Patterns::Base)
+
+        case ast[0]
+        when :send
+          compile_pattern(ast[1]).send(ast[2], *ast[3..-1].map { |x| compile_pattern(x) })
+        when :call
+          @calls.fetch(ast[1]).call
+        when :call_level
+          builder = @precs.fetch(ast[1])
+          level = builder.resolve_level(ast[2])
+          builder.call_for(level)
+        end
       end
 
       def finalize
-        @grammar.finalize(@rules[@main_rule_name].call)
+        fst_call = @calls.values.first
+        @grammar.finalize(fst_call.call)
       end
 
       def process
@@ -119,33 +143,39 @@ module Glush
       def process_seq(mark)
         left = process
         right = process
-        left >> right
+        [:send, left, :>>, right]
       end
 
       def process_alt(mark)
         left = process
         right = process
-        left | right
+        [:send, left, :|, right]
       end
 
       def process_opt(mark)
         base = process
-        base.maybe
+        [:send, base, :maybe]
       end
 
       def process_star(mark)
         base = process
-        base.star
+        [:send, base, :star]
       end
 
       def process_plus(mark)
         base = process
-        base.plus
+        [:send, base, :plus]
       end
 
       def process_pident(mark)
         name = process
-        @rules[name].call
+        [:call, name]
+      end
+
+      def process_pident_level(mark)
+        name = process
+        level = process
+        [:call_level, name, level]
       end
 
       def process_pstring(mark)
@@ -174,12 +204,41 @@ module Glush
         str
       end
 
+      def process_number(mark)
+        str = @string[mark.offset...next_mark.offset]
+        shift
+        str.to_i
+      end
+
       def process_rule(mark)
         name = process
         pattern = process
-        @main_rule_name ||= name
-        @rule_body[name] = pattern
+
+        rule = @grammar._new_rule(name) {
+          compile_pattern(pattern)
+        }
+
+        @calls[name] = proc { rule.call }
       end
+
+      def process_prec_rule(mark)
+        name = process
+
+        builder = @precs[name] = Glush::Grammar::PrecBuilder.new(@grammar, name)
+        while next_mark.name == :prec_branch
+          proc {
+            # We need this because of closures
+            shift
+            level = process
+            pattern = process
+            builder.add(level) { compile_pattern(pattern) }
+          }.call
+        end
+
+        lowest_level = builder.resolve_level(nil)
+        @calls[name] = proc { builder.call_for(lowest_level) }
+      end
+
     end
 
     def self.parse(ebnf)
