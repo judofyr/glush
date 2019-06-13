@@ -135,5 +135,35 @@ class TestEBNF < Minitest::Spec
     assert_matches "a"
     assert_matches "b"
   end
+
+  describe("inverse") do
+    let(:ebnf) { %{
+      S = !'a'*
+    } }
+
+    assert_matches "bbd"
+    assert_matches ""
+    refute_matches "a"
+    refute_matches "aaaaa"
+  end
+
+  describe("range") do
+    let(:ebnf) { %{
+      S = "0".."9"
+    } }
+
+    assert_matches "0"
+    assert_matches "1"
+    assert_matches "8"
+    refute_matches "a"
+  end
+
+  describe("escape codes") do
+    let(:ebnf) {  %{
+      S = 'a\\na' 'b\\u00e5b' 'c\\u{1f600}c'
+    } }
+
+    assert_matches "a\nabåbc😀c"
+  end
 end
 
