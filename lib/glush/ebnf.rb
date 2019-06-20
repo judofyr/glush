@@ -2,8 +2,12 @@ module Glush
   class EBNF
     Grammar = ::Glush::Grammar.new {
       def_rule :ebnf_rule do
-        mark(:rule) >> ident >> ign >> ebnf_rule_sep >> ign >> (str("|") >> ign).maybe >> ebnf_pattern |
-        mark(:prec_rule) >> ident >> ign >> ebnf_rule_sep >> ign >> ebnf_prec_branches
+        mark(:rule) >> ident >> ign >> ebnf_rule_sep >> ign >> (str("|") >> ign).maybe >> ebnf_pattern >> (ign >> guard).maybe |
+        mark(:prec_rule) >> ident >> ign >> ebnf_rule_sep >> ign >> ebnf_prec_branches >> (ign >> guard).maybe
+      end
+
+      def guard
+        str("@guard(") >> ign >> mark(:guard) >> ebnf_pattern >> ign >> str(")")
       end
 
       def ebnf_rule_sep
@@ -295,9 +299,16 @@ module Glush
         name = process
         pattern = process
 
+        if next_mark && next_mark.name == :guard
+          shift
+          guard = process
+          guard_pattern = compile_pattern(guard)
+        end
+
         rule = @grammar._new_rule(name) {
           compile_pattern(pattern)
         }
+        rule.guard = guard_pattern if guard_pattern
 
         @calls[name] = proc { rule.call }
       end
