@@ -123,13 +123,11 @@ module Glush
       main
     }
 
-    class Processor
+    class Processor < MarkProcessor
       attr_reader :grammar
 
       def initialize(marks, string)
-        @marks = marks
-        @string = string
-        @index = 0
+        setup_state(marks, string)
         @grammar = Glush::Grammar.new
 
         @calls = Hash.new
@@ -156,24 +154,6 @@ module Glush
       def finalize
         fst_call = @calls.values.first
         @grammar.finalize(fst_call.call)
-      end
-
-      def process
-        mark = @marks[@index]
-        @index += 1
-        send("process_#{mark.name}", mark)
-      end
-
-      def process_all
-        process while next_mark
-      end
-
-      def next_mark(pos = 0)
-        @marks[@index + pos]
-      end
-
-      def shift
-        @index += 1
       end
 
       def process_seq(mark)
@@ -239,7 +219,7 @@ module Glush
       end
 
       def process_ident(mark)
-        str = @string[mark.offset...next_mark.offset]
+        str = string[mark.offset...next_mark.offset]
         shift
         str
       end
@@ -260,18 +240,18 @@ module Glush
       def process_string(mark)
         result = String.new
         while true
-          result << @string[mark.offset...next_mark.offset]
+          result << string[mark.offset...next_mark.offset]
           case next_mark.name
           when :escape_lit
             slash_start = next_mark; shift
-            char = @string[slash_start.offset+1]
+            char = string[slash_start.offset+1]
             result << ESCAPE_CHAR_MAPPING.fetch(char)
             mark = next_mark; shift
           when :escape_unicode
             shift
             hex_start = next_mark; shift
             hex_stop = next_mark; shift
-            hex = @string[hex_start.offset...hex_stop.offset]
+            hex = string[hex_start.offset...hex_stop.offset]
             char = hex.to_i(16).chr(Encoding::UTF_8)
             result << char
             mark = next_mark; shift
@@ -284,7 +264,7 @@ module Glush
       end
 
       def process_number(mark)
-        str = @string[mark.offset...next_mark.offset]
+        str = string[mark.offset...next_mark.offset]
         shift
         str.to_i
       end
