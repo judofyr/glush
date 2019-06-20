@@ -19,6 +19,8 @@ module Glush
     def each(&blk)
       @data.each(&blk)
     end
+
+    include Enumerable
   end
 end
 

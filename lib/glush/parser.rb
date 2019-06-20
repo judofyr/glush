@@ -249,34 +249,43 @@ module Glush
       end
     end
 
-    ## Marks
-    def each_mark(contexts = @final_states.map(&:context), &blk)
-      if contexts.size != 1
-        raise "ambigious"
-      end
+    def reverse_marks
+      # TODO: This code is a bit hackish
+      marks = []
 
-      contexts[0].each do |item|
-        case item
-        when Mark
-          yield item
-        when CallResult
-          each_mark(item.left_contexts, &blk)
-          rule_contexts = item.rule_results.flat_map { |r| r.contexts }
-          each_mark(rule_contexts, &blk)
-        else
-          raise "Unknown class: #{mark.class}"
+      queue = []
+      queue << @final_states.map(&:context)
+
+      until queue.empty?
+        contexts = queue.pop
+
+        if contexts.is_a?(Mark)
+          marks << contexts
+          next
+        end
+
+        if contexts.size != 1
+          raise "ambigious"
+        end
+
+        contexts[0].each do |item|
+          case item
+          when Mark
+            queue << item
+          when CallResult
+            queue << item.left_contexts
+            rule_contexts = item.rule_results.flat_map { |r| r.contexts }
+            queue << rule_contexts
+          else
+            raise "Unknown class: #{mark.class}"
+          end
         end
       end
-
-      self
+      marks
     end
 
     def flat_marks
-      result = []
-      each_mark do |mark|
-        result << mark
-      end
-      result
+      reverse_marks.reverse
     end
   end
 end
