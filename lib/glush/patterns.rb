@@ -17,6 +17,10 @@ module Glush
         end
       end
 
+      def single_token?
+        false
+      end
+
       def >>(other)
         Seq.new(self, other)
       end
@@ -63,43 +67,67 @@ module Glush
       end
     end
 
-    class Token < Base
-      attr_reader :tokens
+    Less = Struct.new(:token) do
+      def ===(value)
+        value <= token
+      end
 
-      def initialize(token)
-        @tokens = Array(token)
+      def inspect
+        "less(#{token})"
+      end
+    end
+
+    Greater = Struct.new(:token) do
+      def ===(value)
+        value >= token
+      end
+
+      def inspect
+        "greater(#{token})"
+      end
+    end
+
+    class Token < Base
+      def initialize(choice)
+        if ![Integer, Range, Less, Greater, NilClass].any? { |x| choice.is_a?(x) }
+          raise TypeError, "unsupported choice: #{choice.class}"
+        end
+
+        @choice = choice
+      end
+
+      def single_token?
+        true
       end
 
       def match?(token)
-        @tokens.include?(token)
-      end
-
-      def copy
-        Token.new(@tokens)
-      end
-
-      def &(other)
-        if other.is_a?(Token)
-          Token.new(@tokens & other.tokens)
+        if token.nil?
+          false
         else
-          super
+          if @choice.nil?
+            # any
+            true
+          else
+            @choice === token
+          end
         end
       end
 
-      def calculate_empty(b)
-        @is_empty = false
+      def invert
+        case @choice
+        when Integer
+          Token.new(Less.new(@choice - 1)) |
+          Token.new(Greater.new(@choice + 1))
+        when Range
+          Token.new(Less.new(@choice.begin - 1)) |
+          Token.new(Greater.new(@choice.end + 1))
+        else
+          raise "Unknown type: #{@choice}"
+        end
       end
 
-      include Terminal
-
-      def inspect
-        "token(#{@tokens.inspect})"
-      end
-    end
-
-    module FixedToken
       def copy
-        self.class.new
+        Token.new(@choice)
       end
 
       def calculate_empty(b)
@@ -109,76 +137,7 @@ module Glush
       include Terminal
 
       def inspect
-        self.class.name
-      end
-    end
-
-    class Any < Base
-      include FixedToken
-
-      def match?(token)
-        true
-      end
-    end
-
-    class UTF8Char1 < Base
-      include FixedToken
-      RANGE = (0..0b0111_1111)
-
-      def match?(token)
-        RANGE.cover?(token)
-      end
-
-      def complete
-        self
-      end
-    end
-
-    class UTF8Char2 < Base
-      include FixedToken
-      RANGE = (0b1100_0000..0b1101_1111)
-
-      def match?(token)
-        RANGE.cover?(token)
-      end
-
-      def complete
-        self >> UTF8CharLast.new
-      end
-    end
-
-    class UTF8Char3 < Base
-      include FixedToken
-      RANGE = (0b1110_0000..0b1110_1111)
-
-      def match?(token)
-        RANGE.cover?(token)
-      end
-
-      def complete
-        self >> UTF8CharLast.new >> UTF8CharLast.new
-      end
-    end
-
-    class UTF8Char4 < Base
-      include FixedToken
-      RANGE = (0b1111_0000..0b1111_0111)
-
-      def match?(token)
-        RANGE.cover?(token)
-      end
-
-      def complete
-        self >> UTF8CharLast.new >> UTF8CharLast.new >> UTF8CharLast.new
-      end
-    end
-
-    class UTF8CharLast < Base
-      include FixedToken
-      RANGE = (0b1000_0000..0b1011_1111)
-
-      def match?(token)
-        RANGE.cover?(token)
+        "#{@choice.inspect}"
       end
     end
 
@@ -249,6 +208,18 @@ module Glush
 
       def copy
         Alt.new(@left, @right)
+      end
+
+      def single_token?
+        @left.single_token? && @right.single_token?
+      end
+
+      def match?(token)
+        @left.match?(token) || @right.match?(token)
+      end
+
+      def invert
+        @left.invert & @right.invert
       end
 
       def calculate_empty(b)
@@ -327,6 +298,14 @@ module Glush
         @right = right.consume!
       end
 
+      def single_token?
+        @left.single_token? && @right.single_token?
+      end
+
+      def match?(token)
+        @left.match?(token) && @right.match?(token)
+      end
+
       def calculate_empty(b)
         @is_empty = @left.calculate_empty(b) & @right.calculate_empty(b)
       end
@@ -354,6 +333,10 @@ module Glush
         @right.last_set.each do |lst|
           yield lst, Finalizer.new(self, :right)
         end
+      end
+
+      def inspect
+        "conj(#{@left.inspect}, #{@right.inspect})"
       end
     end
 
@@ -406,8 +389,8 @@ module Glush
       end
 
       def guard=(pattern)
-        if !pattern.is_a?(Token)
-          raise TypeError, "only Token pattern can be used as guard" 
+        if !pattern.single_token?
+          raise TypeError, "only single token patterns can be used as guard"
         end
 
         @guard = pattern

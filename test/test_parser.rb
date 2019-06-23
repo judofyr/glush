@@ -155,24 +155,6 @@ class TestParser < Minitest::Spec
     end
   end
 
-  describe(:utf8) do
-    let(:grammar) { TestGrammars.utf8 }
-
-    # UTF-8
-    assert_recognize "iaa"
-    assert_recognize "iøa"
-    assert_recognize "i🎉b"
-    refute_recognize ["i", 0xFF].pack("aC*")
-    refute_recognize ["i", 0xFF, 0xFF].pack("aC*")
-
-    # ASCII
-    assert_recognize "a@"
-    refute_recognize "aø"
-
-    # Bytes
-    assert_recognize ["b", 0xFF].pack("aC*")
-  end
-
   describe(:comments) do
     let(:grammar) { TestGrammars.comments }
 
@@ -257,10 +239,26 @@ class TestParser < Minitest::Spec
     refute_recognize "aabbc"
   }
 
+  describe("any") {
+    let(:grammar) {
+      Glush::Grammar.new {
+        def_rule :s do
+          str("a") >> anytoken
+        end
+
+        s
+      }
+    }
+
+    assert_recognize "ab"
+    assert_recognize "aa"
+    refute_recognize "aaa"
+  }
+
   describe("guards") {
     let(:grammar) {
       Glush::Grammar.new {
-        def_rule :ident, guard: utf8inv("a") do
+        def_rule :ident, guard: inv(str("a")) do
           str("a").plus
         end
 
@@ -285,7 +283,7 @@ class TestParser < Minitest::Spec
       result = parse(grammar, "n*n+n++n")
       refute result.valid?
       assert_equal 6, result.offset
-      assert_includes result.expected_tokens, "n".ord
+      assert result.expected_tokens.any? { |x| x.match?("n".ord) }
     end
 
     it "report errors on ops" do
@@ -293,7 +291,7 @@ class TestParser < Minitest::Spec
       refute result.valid?
       assert_equal 5, result.offset
       %w[+ - * /].each do |op|
-        assert_includes result.expected_tokens, op.ord
+        assert result.expected_tokens.any? { |x| x.match?(op.ord) }
       end
     end
 

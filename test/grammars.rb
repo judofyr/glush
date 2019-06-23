@@ -128,22 +128,10 @@ module TestGrammars
     }
   end
 
-  def utf8
-    @utf8 ||= Glush::Grammar.new {
-      def_rule :main do
-        str("i") >> anyutf8 >> anyutf8 |
-        str("a") >> anyascii |
-        str("b") >> anytoken
-      end
-
-      main
-    }
-  end
-
   def comments
     @comments ||= Glush::Grammar.new {
       def comment
-        str("#") >> utf8inv("\n").star >> str("\n")
+        str("#") >> inv(str("\n")).star >> str("\n")
       end
 
       def_rule :main do

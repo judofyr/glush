@@ -23,33 +23,18 @@ module Glush
       @start_call.rule.body.empty?
     end
 
-    def valid_tokens
-      @tokens ||= (0..255).to_a
-    end
-
     def anytoken
-      Patterns::Any.new
+      token(nil)
     end
 
-    def anyascii
-      Patterns::UTF8Char1.new.complete
-    end
-
-    def anyutf8
-      Patterns::UTF8Char1.new.complete |
-      Patterns::UTF8Char2.new.complete |
-      Patterns::UTF8Char3.new.complete |
-      Patterns::UTF8Char4.new.complete
-    end
-
-    def token(token)
-      Patterns::Token.new(token)
+    def token(choice)
+      Patterns::Token.new(choice)
     end
 
     def str(text)
       case text
       when String
-        text.bytes
+        text.codepoints
           .map { |c| token(c) }
           .reduce { |a, b| a >> b }
       when Range
@@ -74,26 +59,7 @@ module Glush
     end
 
     def inv(pattern)
-      case pattern
-      when Patterns::Token
-        token(valid_tokens - pattern.tokens)
-      when Patterns::Alt
-        inv(pattern.left) & inv(pattern.right)
-      else
-        raise GrammarError, "cannot inverse #{pattern.inspect}"
-      end
-    end
-
-    def utf8inv(str)
-      tokens = str.chars.map do |char|
-        if char.bytesize > 1
-          raise GrammarError, "inverse multi-byte UTF-8 not supported"
-        end
-
-        char.ord
-      end
-
-      token(valid_tokens - tokens)
+      pattern.invert
     end
 
     def eps

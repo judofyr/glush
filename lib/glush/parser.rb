@@ -94,16 +94,13 @@ module Glush
     end
 
     def parse_string(input)
-      input.each_byte do |byte|
+      input.each_codepoint do |codepoint|
         offset = @offset
 
-        self << byte
+        self << codepoint
 
         if @next_states.empty?
           expected_tokens = @failed_terminals
-            .grep(Patterns::Token)
-            .reduce(Set.new) { |s, p| s.merge(p.tokens) }
-
           return ParseError.new(offset, expected_tokens)
         end
       end
@@ -120,7 +117,7 @@ module Glush
     end
 
     def push_string(input)
-      input.each_byte { |byte| self << byte }
+      input.each_codepoint { |codepoint| self << codepoint }
     end
 
     def close

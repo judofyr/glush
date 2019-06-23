@@ -187,7 +187,7 @@ module Glush
         name = process
         case name
         when "any"
-          @grammar.anyutf8
+          @grammar.anytoken
         else
           [:call, name]
         end
