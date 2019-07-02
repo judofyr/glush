@@ -40,11 +40,10 @@ module Glush
       grammar.rules.each do |rule|
         @rules << rule
 
-        first_states = @rule_first[rule] = []
+        first_state = @state_mapping[rule]
+        first_states = @rule_first[rule] = [first_state]
 
         rule.body.first_set.each do |fst_terminal|
-          first_state = @state_mapping[rule]
-          first_states << first_state
           connect(first_state, fst_terminal)
         end
 

@@ -15,13 +15,15 @@ module Glush
 
     def recognize?(input)
       frames = @initial_frames
+      position = 0
 
       input.each_codepoint do |codepoint|
-        frames = process_token(codepoint, frames).next_frames
+        frames = process_token(codepoint, position, frames).next_frames
         return false if frames.empty?
+        position += 1
       end
 
-      process_token(nil, frames).accept?
+      process_token(nil, position, frames).accept?
     end
 
     def parse(input)
@@ -29,14 +31,14 @@ module Glush
       position = 0
 
       input.each_codepoint do |codepoint|
-        frames = process_token(codepoint, frames).next_frames
+        frames = process_token(codepoint, position, frames).next_frames
         if frames.empty?
           return ParseError.new(position)
         end
         position += 1
       end
 
-      last_step = process_token(nil, frames)
+      last_step = process_token(nil, position, frames)
 
       if last_step.accept?
         ParseSuccess.new(last_step)
@@ -45,8 +47,8 @@ module Glush
       end
     end
 
-    def process_token(token, frames)
-      step = Step.new(self, token)
+    def process_token(token, position, frames)
+      step = Step.new(self, token, position)
 
       frames.each do |frame|
         step.process_frame(frame)
@@ -86,46 +88,42 @@ module Glush
       end
     end
 
-    class MergeContext
-      attr_reader :frame
-
-      def initialize(caller)
-        @visited_states = Set.new
-        @context = Context.new(caller, List.empty)
-        @frame = Frame.new(@context)
-      end
-
-      def try_next_state(state)
-        !!@visited_states.add?(state)
-      end
-    end
-
     class Caller
-      attr_reader :returns
-
       def initialize
-        @returns = []
+        @grouped = Hash.new { |h, k| h[k] = [] }
+      end
+
+      def each_return
+        @grouped.each do |(ccaller, next_state), marks|
+          yield ccaller, next_state, marks
+        end
       end
 
       def add_return(context, next_state)
-        @returns << [context, next_state]
+        @grouped[[context.caller, next_state]] << context.marks
       end
     end
 
     class Step
       attr_reader :next_frames
 
-      def initialize(parser, token)
+      def initialize(parser, token, position)
         @parser = parser
         @token = token
+        @position = position
+
         @next_frames = []
         @callers = Hash.new { |h, k| h[k] = Caller.new }
-        @merged_contexts = Hash.new { |h, k| h[k] = MergeContext.new(k) }
+        @returned_callers = Set.new
         @accepted_contexts = []
       end
 
       def accept?
         @accepted_contexts.any?
+      end
+
+      def marks
+        @accepted_contexts[0].marks.to_a
       end
 
       def with_frame(context)
@@ -144,7 +142,7 @@ module Glush
               frame.next_states << action.next_state
             end
           when StateMachine::MarkAction
-            mark = [action.name, 0] # TODO: correct position
+            mark = Mark.new(action.name, @position)
             mark_ctx = Context.new(frame.caller, frame.marks.add(mark))
             with_frame(mark_ctx) do |mark_frame|
               process(mark_frame, action.next_state)
@@ -166,18 +164,22 @@ module Glush
             end
           when StateMachine::ReturnAction
             rule = action.rule
+
+            if @token && rule.guard && !rule.guard.match?(@token)
+              next
+            end
+
             caller = frame.caller
 
-            caller.returns.each do |context, next_state|
-              is_pushed = @merged_contexts.has_key?(context.caller)
-              merge_context = @merged_contexts[context.caller]
+            # TODO: This means that we now ignore ambiguous returns
+            should_process = !!@returned_callers.add?(caller)
+            next if !should_process
 
-              if merge_context.try_next_state(next_state)
-                process(merge_context.frame, next_state)
-              end
-
-              if !is_pushed
-                @next_frames << merge_context.frame
+            caller.each_return do |ccaller, next_state, marks|
+              combined_marks = List.branched(marks).add_list(frame.marks)
+              next_context = Context.new(ccaller, combined_marks)
+              with_frame(next_context) do |next_frame|
+                process(next_frame, next_state)
               end
             end
           when StateMachine::AcceptAction
