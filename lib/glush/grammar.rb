@@ -19,6 +19,10 @@ module Glush
       self
     end
 
+    def state_machine
+      @state_machine ||= StateMachine.new(self)
+    end
+
     def empty?
       @start_call.rule.body.empty?
     end

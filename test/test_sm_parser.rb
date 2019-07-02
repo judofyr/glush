@@ -1,10 +1,10 @@
 require_relative 'helper'
 
-class TestParser < Minitest::Spec
+class TestSMParser < Minitest::Spec
   instance_eval &ParserSuite
   
   def create_parser(grammar)
-    Glush::DirectParser.new(grammar)
+    Glush::SMParser.new(grammar)
   end
 end
 

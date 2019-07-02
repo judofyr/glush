@@ -4,13 +4,16 @@ require_relative 'grammars'
 require 'benchmark'
 
 class Perf
+  Parser = Glush::DirectParser
+
   def self.run
-    g = grammar
+    parser = Parser.new(grammar)
+
     range.each do |n|
       print n, " "
       str = build(n)
       time = Benchmark.measure do
-        result = Glush::Parser.recognize_string?(g, str)
+        result = parser.recognize?(str)
         raise "failed to recognize" if !result
       end
       print time.real, "\n"

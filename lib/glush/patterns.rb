@@ -88,6 +88,8 @@ module Glush
     end
 
     class Token < Base
+      attr_reader :choice
+
       def initialize(choice)
         if ![Integer, Range, Less, Greater, NilClass].any? { |x| choice.is_a?(x) }
           raise TypeError, "unsupported choice: #{choice.class}"
