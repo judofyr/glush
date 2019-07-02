@@ -154,6 +154,7 @@ module Glush
       def finalize
         fst_call = @calls.values.first
         @grammar.finalize(fst_call.call)
+        DirectParser.new(@grammar)
       end
 
       def process_seq(mark)
@@ -219,7 +220,7 @@ module Glush
       end
 
       def process_ident(mark)
-        str = string[mark.offset...next_mark.offset]
+        str = string[mark.position...next_mark.position]
         shift
         str
       end
@@ -240,18 +241,18 @@ module Glush
       def process_string(mark)
         result = String.new
         while true
-          result << string[mark.offset...next_mark.offset]
+          result << string[mark.position...next_mark.position]
           case next_mark.name
           when :escape_lit
             slash_start = next_mark; shift
-            char = string[slash_start.offset+1]
+            char = string[slash_start.position+1]
             result << ESCAPE_CHAR_MAPPING.fetch(char)
             mark = next_mark; shift
           when :escape_unicode
             shift
             hex_start = next_mark; shift
             hex_stop = next_mark; shift
-            hex = string[hex_start.offset...hex_stop.offset]
+            hex = string[hex_start.position...hex_stop.position]
             char = hex.to_i(16).chr(Encoding::UTF_8)
             result << char
             mark = next_mark; shift
@@ -264,7 +265,7 @@ module Glush
       end
 
       def process_number(mark)
-        str = string[mark.offset...next_mark.offset]
+        str = string[mark.position...next_mark.position]
         shift
         str.to_i
       end
@@ -310,15 +311,13 @@ module Glush
         lowest_level = builder.resolve_level(nil)
         @calls[name] = proc { builder.call_for(lowest_level) }
       end
-
     end
 
-    def self.parse(ebnf)
-      parser = Glush::Parser.new(Grammar)
-      parser.push_string(ebnf)
-      parser.close
-      raise "invalid ebnf" if !parser.final?
-      marks = parser.flat_marks
+    Parser = Glush::DirectParser.new(Grammar)
+
+    def self.create_parser(ebnf)
+      result = Parser.parse(ebnf).unwrap
+      marks = result.marks
       processor = Processor.new(marks, ebnf)
       processor.process_all
       processor.finalize

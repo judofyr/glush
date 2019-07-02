@@ -17,7 +17,7 @@ ParserSuite = proc do
 
   def self.assert_marks(input, marks)
     it "should match marks" do
-      result = parser.parse!(input)
+      result = parser.parse(input).unwrap
       assert_equal marks, result.marks.map(&:to_a)
     end
   end
@@ -272,30 +272,25 @@ ParserSuite = proc do
 
     it "report errors on n" do
       result = parser.parse("n*n+n++n")
-      refute result.valid?
-      assert_equal 6, result.offset
-      assert result.expected_tokens.any? { |x| x.match?("n".ord) }
+      assert result.error?
+      assert_equal 6, result.position
     end
 
     it "report errors on ops" do
       result = parser.parse("n*n+n +n")
-      refute result.valid?
-      assert_equal 5, result.offset
-      %w[+ - * /].each do |op|
-        assert result.expected_tokens.any? { |x| x.match?(op.ord) }
-      end
+      assert result.error?
+      assert_equal 5, result.position
     end
 
     it "reports errors on eof" do
       result = parser.parse("n*n+n+")
-      refute result.valid?
-      assert_equal 6, result.offset
-      assert_includes result.expected_tokens, nil
+      assert result.error?
+      assert_equal 6, result.position
     end
 
     it "can extract marks from result" do
       result = parser.parse("n*n")
-      assert result.valid?
+      refute result.error?
       assert result.marks
     end
   }

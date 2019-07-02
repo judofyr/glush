@@ -1,41 +1,38 @@
 require_relative 'helper'
 
 class TestEBNF < Minitest::Spec
-  def recognize?(grammar, input)
-    Glush::Parser.recognize_string?(grammar, input)
+  let(:parser) do
+    Glush::EBNF.create_parser(ebnf)
   end
 
   def self.assert_valid
     it "should be valid" do
-      assert recognize?(Glush::EBNF::Grammar, ebnf), "should be valid"
+      assert Glush::EBNF::Parser.recognize?(ebnf), "should be valid"
     end
   end
 
   def self.refute_valid
     it "should not be valid" do
-      refute recognize?(Glush::EBNF::Grammar, ebnf), "should not valid"
+      refute Glush::EBNF::Parser.recognize?(ebnf), "should not be valid"
     end
   end
 
   def self.assert_matches(input)
     it "should match" do
-      grammar = Glush::EBNF.parse(ebnf)
-      assert recognize?(grammar, input), "should match: #{input}"
+      assert parser.recognize?(input), "should match: #{input}"
     end
   end
 
   def self.refute_matches(input)
     it "should not match" do
-      grammar = Glush::EBNF.parse(ebnf)
-      refute recognize?(grammar, input), "should not match: #{input}"
+      refute parser.recognize?(input), "should not match: #{input}"
     end
   end
 
   def self.assert_marks(input, marks)
     it "should match marks" do
-      grammar = Glush::EBNF.parse(ebnf)
-      result = Glush::Parser.parse_string(grammar, input)
-      assert result.valid?, "expected match for input: #{input}"
+      result = parser.parse(input)
+      refute result.error?, "expected match for input: #{input}"
       assert_equal result.marks.map(&:to_a), marks
     end
   end

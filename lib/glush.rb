@@ -4,6 +4,42 @@ module Glush
   class GrammarError < StandardError
   end
 
+  Mark = Struct.new(:name, :position)
+
+  class ParseError < StandardError
+    attr_reader :position
+
+    def initialize(position)
+      @position = position
+    end
+
+    def error?
+      true
+    end
+
+    def unwrap
+      raise self
+    end
+  end
+
+  class ParseSuccess
+    def initialize(result)
+      @result = result
+    end
+
+    def marks
+      @result.marks
+    end
+
+    def error?
+      false
+    end
+
+    def unwrap
+      self
+    end
+  end
+
   autoload :Grammar, __dir__ + '/glush/grammar.rb'
   autoload :Patterns, __dir__ + '/glush/patterns.rb'
   autoload :StateMachine, __dir__ + '/glush/state_machine.rb'

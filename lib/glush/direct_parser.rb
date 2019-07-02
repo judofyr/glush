@@ -12,14 +12,6 @@ module Glush
     def parse(input)
       Parser.parse_string(@grammar, input)
     end
-
-    def parse!(input)
-      result = parse(input)
-      if !result.valid?
-        raise "parser failed"
-      end
-      result
-    end
   end
 end
 

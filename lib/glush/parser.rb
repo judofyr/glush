@@ -6,8 +6,6 @@ module Glush
       end
     end
 
-    Mark = Struct.new(:name, :offset)
-
     # Represents a span where a rule was successfully completed
     RuleSpan = Struct.new(:rule, :left_offset)
 
@@ -44,33 +42,6 @@ module Glush
       end
     end
 
-    class ParseError
-      attr_reader :offset, :expected_tokens
-
-      def initialize(offset, expected_tokens)
-        @offset = offset
-        @expected_tokens = expected_tokens
-      end
-
-      def valid?
-        false
-      end
-    end
-
-    class ParseSuccess
-      def initialize(parser)
-        @parser = parser
-      end
-
-      def marks
-        @parser.flat_marks
-      end
-
-      def valid?
-        true
-      end
-    end
-
     def initialize(grammar)
       @grammar = grammar
       @offset = 0
@@ -83,10 +54,7 @@ module Glush
     end
 
     def self.recognize_string?(grammar, string)
-      parser = new(grammar)
-      parser.push_string(string)
-      parser.close
-      parser.final?
+      !parse_string(grammar, string).error?
     end
 
     def self.parse_string(grammar, string)
@@ -100,8 +68,7 @@ module Glush
         self << codepoint
 
         if @next_states.empty?
-          expected_tokens = @failed_terminals
-          return ParseError.new(offset, expected_tokens)
+          return ParseError.new(offset)
         end
       end
 
@@ -112,7 +79,7 @@ module Glush
       if final?
         ParseSuccess.new(self)
       else
-        ParseError.new(offset, Set[nil])
+        ParseError.new(offset)
       end
     end
 
@@ -136,7 +103,6 @@ module Glush
       @next_states = []
       @followed_states = Set.new
       @completed_conj = Hash.new { |h, k| h[k] = {} }
-      @failed_terminals = Set.new
       @final_states = []
       @states.each do |state|
         follow(state, token)
@@ -227,8 +193,6 @@ module Glush
       else
         if state.terminal.match?(token)
           accept_transitions(state.terminal, state.rule_offset, state.context)
-        else
-          @failed_terminals << state.terminal
         end
       end
     end
@@ -281,7 +245,7 @@ module Glush
       marks
     end
 
-    def flat_marks
+    def marks
       reverse_marks.reverse
     end
   end
