@@ -13,16 +13,6 @@ module Glush
       @initial_frames = [initial_frame]
     end
 
-    def process_token(token, frames)
-      step = Step.new(self, token)
-
-      frames.each do |frame|
-        step.process_frame(frame)
-      end
-
-      step
-    end
-
     def recognize?(input)
       frames = @initial_frames
 
@@ -32,6 +22,37 @@ module Glush
       end
 
       process_token(nil, frames).accept?
+    end
+
+    def parse(input)
+      frames = @initial_frames
+      position = 0
+
+      input.each_codepoint do |codepoint|
+        frames = process_token(codepoint, frames).next_frames
+        if frames.empty?
+          return ParseError.new(position)
+        end
+        position += 1
+      end
+
+      last_step = process_token(nil, frames)
+
+      if last_step.accept?
+        ParseSuccess.new(last_step)
+      else
+        ParseError.new(position)
+      end
+    end
+
+    def process_token(token, frames)
+      step = Step.new(self, token)
+
+      frames.each do |frame|
+        step.process_frame(frame)
+      end
+
+      step
     end
 
     class Context
@@ -100,11 +121,11 @@ module Glush
         @next_frames = []
         @callers = Hash.new { |h, k| h[k] = Caller.new }
         @merged_contexts = Hash.new { |h, k| h[k] = MergeContext.new(k) }
-        @is_accept = false
+        @accepted_contexts = []
       end
 
       def accept?
-        @is_accept
+        @accepted_contexts.any?
       end
 
       def with_frame(context)
@@ -160,7 +181,7 @@ module Glush
               end
             end
           when StateMachine::AcceptAction
-            @is_accept = true
+            @accepted_contexts << frame.context
           else
             raise "Unknown action: #{action}"
           end
