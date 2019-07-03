@@ -293,15 +293,14 @@ module Glush
     end
 
     class Conj < Base
-      Finalizer = Struct.new(:id, :type)
-
       def initialize(left, right)
         @left = left.consume!
         @right = right.consume!
+        raise GrammarError, "only single token can be used in conjuctions" if !@left.single_token? or !@right.single_token?
       end
 
       def single_token?
-        @left.single_token? && @right.single_token?
+        true
       end
 
       def match?(token)
@@ -309,33 +308,14 @@ module Glush
       end
 
       def calculate_empty(b)
-        @is_empty = @left.calculate_empty(b) & @right.calculate_empty(b)
+        @is_empty = false
       end
 
       def static?
-        @left.static? && @right.static?
+        false
       end
 
-      def first_set
-        @first_set ||= @left.first_set | @right.first_set
-      end
-
-      def last_set
-        @last_set ||= Set[self]
-      end
-
-      def each_pair(&blk)
-        @left.each_pair(&blk)
-        @right.each_pair(&blk)
-
-        @left.last_set.each do |lst|
-          yield lst, Finalizer.new(self, :left)
-        end
-
-        @right.last_set.each do |lst|
-          yield lst, Finalizer.new(self, :right)
-        end
-      end
+      include Terminal
 
       def inspect
         "conj(#{@left.inspect}, #{@right.inspect})"

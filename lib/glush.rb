@@ -46,8 +46,8 @@ module Glush
 
   autoload :SMParser, __dir__ + '/glush/sm_parser.rb'
 
-  autoload :DirectParser, __dir__ + '/glush/direct_parser.rb'
-  autoload :Parser, __dir__ + '/glush/parser.rb'
+  autoload :DefaultParser, __dir__ + '/glush/default_parser.rb'
+
   autoload :List, __dir__ + '/glush/list.rb'
   autoload :MarkProcessor, __dir__ + '/glush/mark_processor.rb'
 

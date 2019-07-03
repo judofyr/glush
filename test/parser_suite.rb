@@ -205,31 +205,6 @@ ParserSuite = proc do
     ]
   end
 
-  describe("conj") {
-    let(:grammar) {
-      Glush::Grammar.new {
-        def_rule :s do
-          (str("a").plus >> b) &
-          (a >> str("c").plus)
-        end
-
-        def_rule :a do
-          str("a") >> a.maybe >> str("b")
-        end
-
-        def_rule :b do
-          str("b") >> b.maybe >> str("c")
-        end
-
-        s
-      }
-    }
-
-    assert_recognize "abc"
-    assert_recognize "aabbcc"
-    refute_recognize "aabbc"
-  }
-
   describe("any") {
     let(:grammar) {
       Glush::Grammar.new {

@@ -41,7 +41,7 @@ module Glush
         @rules << rule
 
         first_state = @state_mapping[rule]
-        first_states = @rule_first[rule] = [first_state]
+        @rule_first[rule] = [first_state]
 
         rule.body.first_set.each do |fst_terminal|
           connect(first_state, fst_terminal)
@@ -73,7 +73,7 @@ module Glush
         rule = terminal.rule
         action = CallAction.new(rule, return_state)
         state.actions << action
-      when Patterns::Token
+      when Patterns::Token, Patterns::Conj
         next_state = @state_mapping[terminal]
         action = TokenAction.new(terminal, next_state)
         state.actions << action
