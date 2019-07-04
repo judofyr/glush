@@ -1,6 +1,6 @@
 ParserSuite = proc do
   let(:parser) do
-    create_parser(grammar)
+    @parser ||= create_parser(grammar)
   end
 
   def self.assert_recognize(input)
@@ -17,6 +17,7 @@ ParserSuite = proc do
 
   def self.assert_marks(input, marks)
     it "should match marks" do
+      skip unless parser.respond_to?(:parse)
       result = parser.parse(input).unwrap
       assert_equal marks, result.marks.map(&:to_a)
     end
@@ -244,6 +245,7 @@ ParserSuite = proc do
 
   describe("error reporting") {
     let(:grammar) { TestGrammars.prec_expr }
+    before { skip if !parser.respond_to?(:parse) }
 
     it "report errors on n" do
       result = parser.parse("n*n+n++n")
