@@ -46,6 +46,9 @@ module Glush
 
   autoload :SMParser, __dir__ + '/glush/sm_parser.rb'
 
+  autoload :JavaScriptGenerator, __dir__ + '/glush/javascript_generator.rb'
+  autoload :DuktapeParser, __dir__ + '/glush/duktape_parser.rb'
+
   autoload :DefaultParser, __dir__ + '/glush/default_parser.rb'
 
   autoload :List, __dir__ + '/glush/list.rb'
