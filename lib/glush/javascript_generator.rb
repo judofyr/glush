@@ -28,7 +28,8 @@ module Glush
     end
 
     def emit_inital_frames
-      emit("var initialFrame = new Frame();")
+      emit("var initialContext = new Context(null, null);")
+      emit("var initialFrame = new Frame(initialContext);")
       @sm.initial_states.each do |state|
         emit("initialFrame.addNextState(%s);" % state_lvar(state))
       end
@@ -77,8 +78,7 @@ module Glush
           result << "step.addAccept(frame.context);"
         when StateMachine::MarkAction
           state = state_lvar(action.next_state)
-          # TODO: Implement marks
-          result << "#{state}.p(step, frame);"
+          result << "step.addMark(%p, frame.context, %s);" % [action.name.to_s, state]
         else
           raise "unknown action: #{action}"
         end
@@ -98,6 +98,10 @@ module Glush
           "#{var_name} > #{pattern.choice.token}"
         when nil
           "true"
+        when Range
+          a = "#{var_name} >= #{pattern.choice.begin}"
+          b = "#{var_name} <= #{pattern.choice.end}"
+          "(#{a} && #{b})"
         else
           raise "unknown: #{pattern.choice}"
         end
@@ -141,13 +145,32 @@ module Glush
       this.acceptedContexts.push(context);
     }
 
+    Step.prototype.addMark = function addMark(name, context, nextState) {
+      var mark = {
+        type: "mark",
+        name: name,
+        position: this.position,
+      };
+      var marks = context.marks
+        ? {
+            type: "concat",
+            left: context.marks,
+            right: mark,
+          }
+        : mark;
+      var nextContext = new Context(context.caller, marks);
+      var nextFrame = new Frame(nextContext);
+      nextState.p(this, nextFrame);
+      addNextFrame(this, nextFrame);
+    }
+
     Step.prototype.startCall = function startCall(ruleId) {
       var caller = this.callers[ruleId];
 
       if (!caller) {
         caller = new Caller();
         this.callers[ruleId] = caller;
-        var callContext = new Context(caller);
+        var callContext = new Context(caller, null);
         var callFrame = new Frame(callContext);
         var states = ruleInitialStates[ruleId];
         for (var i = 0; i < states.length; i++) {
@@ -166,8 +189,20 @@ module Glush
       var returns = caller.returns;
       for (var i = 0; i < returns.length; i++) {
         var ret = returns[i];
-        var context = ret[0];
+        var callerContext = ret[0];
         var state = ret[1];
+
+        var leftMarks = callerContext.marks;
+        var rightMarks = frame.context.marks;
+        var marks = (leftMarks && rightMarks)
+          ?  {
+              type: "concat",
+              left: callerContext.marks,
+              right: frame.context.marks
+            }
+          : (leftMarks || rightMarks);
+
+        var context = new Context(callerContext.caller, marks);
         var nextFrame = new Frame(context);
         state.p(this, nextFrame);
         addNextFrame(this, nextFrame);
@@ -182,8 +217,9 @@ module Glush
       this.returns.push([context, nextState]);
     }
 
-    function Context(caller) {
+    function Context(caller, marks) {
       this.caller = caller;
+      this.marks = marks;
     }
 
     function Frame(context) {
@@ -204,7 +240,7 @@ module Glush
     }
 
     Frame.prototype.copy = function copy() {
-      return new Frame(this.context);
+      return new Frame(this.context, this.marks);
     }
 
     function processToken(token, position, frames) {
@@ -243,6 +279,54 @@ module Glush
 
       step = processToken(null, i, frames);
       return step.wasAccepted();
+    }
+
+    function flattenMarks(marks) {
+      if (!marks) return []
+
+      var queue = [marks];
+      var result = [];
+
+      while (queue.length) {
+        var m = queue.shift();
+        if (m.type === "concat") {
+          queue.unshift(m.left, m.right);
+        } else if (m.type === "mark") {
+          result.push(m);
+        } else {
+          throw new Error("unknown mark type: " + m.type);
+        }
+      }
+
+      return result;
+    }
+
+    function parse(input) {
+      var frames = initialFrames;
+
+      var i = 0;
+      for (; i < input.length; i++) {
+        var token = input.charCodeAt(i);
+        var step = processToken(token, i, frames);
+        if (!step.hasNextFrames()) {
+          return { type: "error", position: i };
+        }
+        frames = step.nextFrames;
+      }
+
+      step = processToken(null, i, frames);
+
+      if (!step.wasAccepted()) {
+        return { type: "error", position: i };
+      }
+
+      var ctx = step.acceptedContexts[0];
+      var marks = flattenMarks(ctx.marks);
+
+      return {
+        type: "success",
+        marks: marks
+      }
     }
     JS
   end
