@@ -154,7 +154,7 @@ module Glush
       def finalize
         fst_call = @calls.values.first
         @grammar.finalize(fst_call.call)
-        DefaultParser.new(@grammar)
+        @grammar
       end
 
       def process_seq(mark)
@@ -315,12 +315,16 @@ module Glush
 
     Parser = Glush::DefaultParser.new(Grammar)
 
-    def self.create_parser(ebnf)
+    def self.create_gammar(ebnf)
       result = Parser.parse(ebnf).unwrap
       marks = result.marks
       processor = Processor.new(marks, ebnf)
       processor.process_all
       processor.finalize
+    end
+
+    def self.create_parser(ebnf)
+      DefaultParser.new(create_gammar(ebnf))
     end
   end
 end
