@@ -315,7 +315,7 @@ module Glush
 
     Parser = Glush::DefaultParser.new(Grammar)
 
-    def self.create_gammar(ebnf)
+    def self.create_grammar(ebnf)
       result = Parser.parse(ebnf).unwrap
       marks = result.marks
       processor = Processor.new(marks, ebnf)
@@ -324,7 +324,7 @@ module Glush
     end
 
     def self.create_parser(ebnf)
-      DefaultParser.new(create_gammar(ebnf))
+      DefaultParser.new(create_grammar(ebnf))
     end
   end
 end
