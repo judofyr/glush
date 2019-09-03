@@ -73,7 +73,12 @@ module Glush
           ]
         when StateMachine::ReturnAction
           rule = action.rule
-          result << "step.returnCall(%s, frame);" % rule_id(rule)
+          if rule.guard
+            guard = "if (%s) " % match_pattern(rule.guard)
+          else
+            guard = ""
+          end
+          result << "#{guard}step.returnCall(%s, frame);" % rule_id(rule)
         when StateMachine::AcceptAction
           result << "step.addAccept(frame.context);"
         when StateMachine::MarkAction
@@ -93,9 +98,9 @@ module Glush
         when Integer
           "#{var_name} === #{pattern.choice}"
         when Patterns::Less
-          "#{var_name} < #{pattern.choice.token}"
+          "#{var_name} <= #{pattern.choice.token}"
         when Patterns::Greater
-          "#{var_name} > #{pattern.choice.token}"
+          "#{var_name} >= #{pattern.choice.token}"
         when nil
           "true"
         when Range
@@ -105,6 +110,14 @@ module Glush
         else
           raise "unknown: #{pattern.choice}"
         end
+      when Patterns::Conj
+        left = match_pattern(pattern.left, var_name)
+        right = match_pattern(pattern.right, var_name)
+        "(#{left} && #{right})"
+      when Patterns::Alt
+        left = match_pattern(pattern.left, var_name)
+        right = match_pattern(pattern.right, var_name)
+        "(#{left} || #{right})"
       else
         raise "unknown: #{pattern}"
       end

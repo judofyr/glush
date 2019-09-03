@@ -293,6 +293,8 @@ module Glush
     end
 
     class Conj < Base
+      attr_reader :left, :right
+
       def initialize(left, right)
         @left = left.consume!
         @right = right.consume!
