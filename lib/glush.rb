@@ -40,20 +40,13 @@ module Glush
     end
   end
 
-  autoload :Grammar, __dir__ + '/glush/grammar.rb'
-  autoload :Patterns, __dir__ + '/glush/patterns.rb'
-  autoload :StateMachine, __dir__ + '/glush/state_machine.rb'
-
-  autoload :SMParser, __dir__ + '/glush/sm_parser.rb'
-
-  autoload :JavaScriptGenerator, __dir__ + '/glush/javascript_generator.rb'
-  autoload :DuktapeParser, __dir__ + '/glush/duktape_parser.rb'
-
   autoload :DefaultParser, __dir__ + '/glush/default_parser.rb'
-
+  autoload :DSL, __dir__ + '/glush/dsl.rb'
+  autoload :Expr, __dir__ + '/glush/expr.rb'
+  autoload :ExprMatcher, __dir__ + '/glush/expr_matcher.rb'
+  autoload :FixpointBuilder, __dir__ + '/glush/fixpoint_builder.rb'
   autoload :List, __dir__ + '/glush/list.rb'
   autoload :MarkProcessor, __dir__ + '/glush/mark_processor.rb'
-
-  autoload :EBNF, __dir__ + '/glush/ebnf.rb'
+  autoload :P1, __dir__ + '/glush/p1.rb'
 end
 

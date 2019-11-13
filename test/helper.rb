@@ -3,6 +3,8 @@ SimpleCov.start do
   add_filter "/test/"
 end
 
+require 'pp'
+
 require_relative '../lib/glush'
 require_relative 'grammars'
 require_relative 'parser_suite'

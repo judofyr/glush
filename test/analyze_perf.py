@@ -13,12 +13,13 @@ coeffs = np.polyfit(np.log(n), np.log(time), 1)
 k = coeffs[0]
 C = np.exp(coeffs[1])
 
+print("C = %g" % C)
 print("n^{%.3f}" % k)
 
 fitted = C * n**k
 
 import matplotlib.pyplot as plt
-plt.plot(n, time, label="actual")
+plt.plot(n, time, 'x', label="actual")
 plt.plot(n, fitted, label="fitted")
 plt.xlabel("n")
 plt.ylabel("time [s]")
