@@ -1,27 +1,28 @@
-= Glush: A parser toolkit
+# Glush: A parser toolkit
 
-Glush is a versatile parser toolkit based on Glushkov's construction algorithm:
+Glush is a versatile parser toolkit:
 
+- Generates JavaScript parsers.
+- Usable as a parser combinator library in Ruby.
 - Parses LL/LR grammars in linear time.
 - Parses all context-free grammars (even the most ambiguous ones) in worst-case cubic time.
 - Scannerless: Works directly on characters (no lexer needed).
 - Streamable, push-based API: You give it one token at a time; fail-fast supported.
-- Supports matching UTF-8 characters.
 - Reads EBNF grammars.
 - Flexible operator precedence.
-- Usable as a parser combinator library in Ruby.
 - Licensed under link:LICENSE.md[0BSD].
 
-Planned features:
+## Status
 
-- Documentation
-- Ambiguity error reporting
-- Generating JavaScript/C/Go parser
+Glush is, as of late 2019, under active development with changes being made to the core algorithm in the link:https://github.com/judofyr/glush/tree/v2[v2] branch.
+The code in the master branch is usable, but has known deficiencies.
+For now it's recommended to wait until the new implementation stabilizes and as such there is limited documentation and examples.
 
-Current status:
+## Planned features
 
-- Not ready for production. Glush is mainly interesting if you like to explore parser algorithms.
-- The core of the algorithm is complete and is working quite nicely.
-- There's some fundamental features (e.g. operator precedence handling) that needs to be completed before the API can be fully decided.
-- Most of the planned features are trivial.
+- Restructuring of the parser algorithm.
+- Documentation of EBNF format.
+- Command-line tool for parsing EBNF grammars and generating parsers.
+- Improved handling of ambiguity.
+- Generating Go parser.
 
