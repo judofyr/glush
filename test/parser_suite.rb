@@ -32,6 +32,13 @@ ParserSuite = proc do
     assert_recognize "(())"
   end
 
+  describe(:ones) do
+    let(:grammar) { TestGrammars.ones }
+    (1..15).each do |num|
+      assert_recognize "1" * num
+    end
+  end
+
   describe(:empty_left_recursion) do
     let(:grammar) { TestGrammars.empty_left_recursion }
 

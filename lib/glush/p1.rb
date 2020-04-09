@@ -126,7 +126,9 @@ module Glush
           # Handle aliases
           (fst & lst).each do |expr|
             call_set(expr).each do |context_rule, cont_expr, invoke_rule|
-              result << [nil, rule_call, invoke_rule]
+              if context_rule.nil?
+                result << [nil, rule_call, invoke_rule]
+              end
             end
           end
 
@@ -179,15 +181,8 @@ module Glush
 
       @direct_rule_children = Hash.new { |h, k|
         h[k] = @builder.call_set(k)
-          .select { |context_rule, _, _| context_rule.nil? }
+          .select { |context_rule, _| context_rule.nil? }
           .map { |_, _, invoke_rule| invoke_rule }
-          .uniq
-      }
-
-      @indirect_rule_children = Hash.new { |h, k|
-        h[k] = @builder.call_set(k)
-          .select { |context_rule, _, _| @direct_rule_children[k].include?(context_rule) }
-          .map { |_, cont_expr, invoke_rule| [cont_expr, invoke_rule] }
           .uniq
       }
 
@@ -219,79 +214,70 @@ module Glush
       input.each_codepoint do |token|
         step = Step.new(next_pos)
         process_entries(step, entries, token)
-        enter_transitions(step)
         enter_calls(step)
         entries = step.entries
         return false if entries.empty?
         next_pos += 1
       end
 
-      return entries.any? { |entry| entry.terminal == @final }
+      return entries.any? { |expr, entry_set| expr == @final }
     end
-
-    Entry = Struct.new(:terminal, :context_set)
 
     def initial_entries
       step = Step.new(0)
-      context = Context.new(0, nil)
-      context_set = Set[context]
+      entry_set = EntrySet.new
       @expr_first.each do |expr|
-        accept(step, expr, context_set)
+        accept(step, expr, entry_set)
       end
       enter_calls(step)
       step.entries
     end
 
-    def accept(step, expr, context_set)
+    def accept(step, expr, entry_set)
       if expr.is_a?(Expr::RuleCall)
         @call_set_with_conts[expr].each do |context_rule, cont_expr, invoke_rule|
-          ctx = step.rule_contexts[invoke_rule]
-
           if context_rule
-            ctx.add_callback(cont_expr, step.rule_contexts[context_rule])
+            step.calls[invoke_rule] << Entry.new(cont_expr, step.calls[context_rule])
           else
-            ctx.merge_callback(cont_expr, context_set)
+            step.calls[invoke_rule] << Entry.new(cont_expr, entry_set)
           end
         end
 
         if @in_tail_position[expr]
           @direct_rule_children[expr].each do |invoke_rule|
-            step.pending_calls[invoke_rule].merge(context_set)
-          end
-
-          @indirect_rule_children[expr].each do |cont_expr, invoke_rule|
-            ctx = step.rule_contexts[invoke_rule]
-            ctx.merge_callback(cont_expr, context_set)
+            step.tail_calls[invoke_rule] << entry_set
           end
         end
       else
-        step.entries << Entry.new(expr, context_set)
+        step.terminals[expr].merge(entry_set)
       end
     end
 
     def enter_calls(step)
-      step.rule_contexts.each do |rule, context|
-        if @rule_term_first[rule].any?
-          step.pending_calls[rule] << context
+      step.tail_calls.each do |invoke_rule, entry_sets|
+        entry_sets.each do |entry_set|
+          step.calls[invoke_rule].merge(entry_set)
         end
       end
 
-      step.pending_calls.each do |rule, context_set|
-        @rule_term_first[rule].each do |expr|
-          step.entries << Entry.new(expr, context_set)
+      step.calls.each do |rule, entry_set|
+        @rule_term_first[rule].each do |term|
+          step.terminals[term].merge(entry_set)
         end
       end
     end
 
     def process_entries(step, entries, token)
-      entries.each do |entry|
-        if ExprMatcher.expr_matches?(entry.terminal, token)
-          step.pending_transitions[entry.terminal].merge(entry.context_set)
+      entries.each do |expr, entry_set|
+        if ExprMatcher.expr_matches?(expr, token)
+          @transitions[expr].each do |next_expr|
+            accept(step, next_expr, entry_set)
+          end
 
-          if @in_tail_position[entry.terminal]
-            entry.context_set.each do |context|
-              context.each do |rule_call, context_set|
-                step.pending_transitions[rule_call].merge(context_set)
+          if @in_tail_position[expr]
+            entry_set.each do |entry|
+              @transitions[entry.expr].each do |next_expr|
+                accept(step, next_expr, entry.entry_set)
               end
             end
           end
@@ -299,44 +285,71 @@ module Glush
       end
     end
 
-    def enter_transitions(step)
-      step.pending_transitions.each do |expr, context_set|
-        @transitions[expr].each do |next_expr|
-          accept(step, next_expr, context_set)
+    Entry = Struct.new(:expr, :entry_set)
+
+    class EntrySet
+      attr_reader :entries
+
+      def initialize
+        @entries = nil
+        @borrowed = false
+      end
+
+      def <<(entry)
+        if @entries.nil?
+          @entries = Set.new
+        elsif @borrowed
+          @entries = @entries.dup
+          @borrowed = false
+        end
+
+        @entries << entry
+      end
+      
+      def merge(other)
+        if @entries.nil?
+          @entries = other.entries
+          @borrowed = true
+          return
+        end
+
+        if @borrowed
+          @entries = @entries | other.entries
+          @borrowed = false
+        else
+          @entries.merge(other.entries)
+        end
+      end
+
+      def any?
+        @entries.any?
+      end
+
+      def each(&blk)
+        @entries.each(&blk)
+      end
+
+      def size
+        if @entries
+          @entries.size
+        else
+          0
         end
       end
     end
 
-    class Context
-      attr_reader :position, :rule
-
-      def initialize(position, rule)
-        @position = position
-        @rule = rule
-        @callback_sets = Hash.new { |h, k| h[k] = Set.new }
-      end
-
-      def merge_callback(rule_call, context_set)
-        @callback_sets[rule_call].merge(context_set)
-      end
-
-      def add_callback(rule_call, parent_context)
-        @callback_sets[rule_call] << parent_context
-      end
-
-      def each(&blk)
-        @callback_sets.each(&blk)
-      end
-    end
-
     class Step
-      attr_reader :entries, :pending_calls, :rule_contexts, :pending_transitions
+      attr_reader :position, :terminals, :calls, :tail_calls
 
       def initialize(position)
-        @entries = Set.new
-        @rule_contexts = Hash.new { |h, k| h[k] = Context.new(position, k) }
-        @pending_calls = Hash.new { |h, k| h[k] = Set.new }
-        @pending_transitions = Hash.new { |h, k| h[k] = Set.new }
+        @position = position
+        @terminals = Hash.new { |h, k| h[k] = EntrySet.new }
+        @calls = Hash.new { |h, k| h[k] = EntrySet.new }
+        @tail_calls = Hash.new { |h, k| h[k] = Set.new }
+      end
+
+      def entries
+        terminals
       end
     end
   end

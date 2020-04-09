@@ -24,6 +24,17 @@ module TestGrammars
     }
   end
 
+  def ones
+    @ones ||= Glush::DSL.build {
+      def_rule :s do
+        s >> str("1") |
+        str("1")
+      end
+
+      s
+    }
+  end
+
   def right_recurse
     @right_recurse ||= Glush::DSL.build {
       def_rule :atom do
