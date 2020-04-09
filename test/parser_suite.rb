@@ -227,6 +227,81 @@ ParserSuite = proc do
     assert_recognize "a1b"
   }
 
+  describe("basic left recursive") {
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :a do
+          b >> str("a")
+        end
+
+        def_rule :b do
+          c >> str("b")
+        end
+
+        def_rule :c do
+          str("c")
+        end
+
+        def_rule :a_indirect do
+          a
+        end
+
+        str("s") >> a_indirect >> str("s")
+      }
+    }
+
+    assert_recognize "scbas"
+  }
+
+  describe("mixed recursive") {
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :a do
+          str("a") >> b
+        end
+
+        def_rule :b do
+          c >> str("b")
+        end
+
+        def_rule :c do
+          str("c")
+        end
+
+        a
+      }
+    }
+
+    assert_recognize "acb"
+  }
+
+  describe("mixed nested recursive") {
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :a do
+          str("a") >> b
+        end
+
+        def_rule :b do
+          c >> str("b")
+        end
+
+        def_rule :c do
+          d >> str("c")
+        end
+
+        def_rule :d do
+          str("d")
+        end
+
+        a
+      }
+    }
+
+    assert_recognize "adcb"
+    refute_recognize "adc"
+  }
+
   describe("error reporting") {
     let(:grammar) { TestGrammars.prec_expr }
     before { skip if !parser.respond_to?(:parse) }

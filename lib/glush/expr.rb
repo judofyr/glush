@@ -104,23 +104,6 @@ module Glush
       end
     end
 
-    class Marker < Base
-      attr_reader :name
-
-      def initialize(name)
-        @name = name
-        @is_terminal = false
-      end
-
-      def copy
-        Marker.new(@name)
-      end
-
-      def inspect
-        "mark(#{@name})"
-      end
-    end
-
     class Eps < Base
       def initialize
         @is_terminal = false
@@ -204,11 +187,13 @@ module Glush
 
     class Rule
       attr_reader :name, :calls
+      attr_accessor :mark
 
       def initialize(name, &blk)
         @name = name
         @code = blk
         @calls = []
+        @mark = nil
       end
 
       def call

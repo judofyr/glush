@@ -31,44 +31,34 @@ class TestP1 < Minitest::Spec
     end
   end
 
-  describe "Enter set" do
-    it "handles deeply nested calls" do
+  describe :call_set do
+    it "handles tail recursive with aliases" do
+      b = nil
+      c = nil
+
       s = Glush::DSL.build {
         def_rule :a do
-          b | c
+          b >> str("a")
         end
 
         def_rule :b do
-          d | str("d")
-        end
-
-        def_rule :d do
-          str("e")
+          c >> str("b")
         end
 
         def_rule :c do
-          str("f")
+          str("c")
         end
+
+        b = self.b
+        c = self.c
 
         a
       }
 
-      e = builder.enter_set(s)
-      assert_equal 3, e.size
-    end
-
-    it "handles left recursive rules" do
-      s = Glush::DSL.build {
-        def_rule :a do
-          a >> str("+") >> a |
-          str("1")
-        end
-
-        a
-      }
-
-      e = builder.enter_set(s)
-      assert_equal 1, e.size
+      call_set = builder.call_set(s)
+      assert_includes call_set, [nil, s, s.rule]
+      assert_includes call_set, [s.rule, b, b.rule]
+      assert_includes call_set, [b.rule, c, c.rule]
     end
   end
 end

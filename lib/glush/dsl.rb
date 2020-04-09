@@ -52,10 +52,6 @@ module Glush
       Expr::Eps.new
     end
 
-    def mark(name = :mark)
-      Expr::Marker.new(name)
-    end
-
     def sep_by(p, sep)
       sep_by1(p, sep).maybe
     end
@@ -72,9 +68,16 @@ module Glush
       (p >> sep).plus
     end
 
-    def def_rule(name, &blk)
+    def def_rule(name, mark: nil, &blk)
       rule = _new_rule(name.to_s, &blk)
+      rule.mark = mark
       define_singleton_method(name) { rule.call }
+    end
+
+    def mark(mark, &blk)
+      rule = _new_rule("rule_#{mark}", &blk)
+      rule.mark = mark
+      rule.call
     end
 
     class PrecBuilder

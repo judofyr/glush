@@ -5,9 +5,8 @@ module Glush
 
       def initialize
         @nullable_fixpoint = FixpointBuilder.new(bottom: false)
-        @enter_fixpoint = FixpointBuilder.new(bottom: EMPTY_SET)
         @rules_fixpoint = FixpointBuilder.new(bottom: EMPTY_SET)
-        @alias_fixpoint = FixpointBuilder.new(bottom: EMPTY_SET)
+        @call_fixpoint = FixpointBuilder.new(bottom: EMPTY_SET)
       end
 
       def nullable(expr)
@@ -20,7 +19,7 @@ module Glush
           nullable(expr.left) & nullable(expr.right)
         when Expr::Plus
           nullable(expr.child)
-        when Expr::Eps, Expr::Marker
+        when Expr::Eps
           true
         when Expr::RuleCall
           @nullable_fixpoint.calculate(expr) do
@@ -45,7 +44,7 @@ module Glush
           end
         when Expr::Plus
           first_set(expr.child)
-        when Expr::Eps, Expr::Marker
+        when Expr::Eps
           EMPTY_SET
         when Expr::RuleCall
           Set[expr]
@@ -68,7 +67,7 @@ module Glush
           end
         when Expr::Plus
           last_set(expr.child)
-        when Expr::Eps, Expr::Marker
+        when Expr::Eps
           EMPTY_SET
         when Expr::RuleCall
           Set[expr]
@@ -104,34 +103,33 @@ module Glush
             end
           end
           result
-        when Expr::Eps, Expr::RuleCall, Expr::Marker
+        when Expr::Eps, Expr::RuleCall
           EMPTY_SET
         else
           raise NotImplementedError, "#{expr} not handled"
         end
       end
 
-      def enter_set(rule_call)
-        @enter_fixpoint.calculate(rule_call) do
-          result = Set[]
-          first_set(rule_call.rule.body).each do |p|
-            if p.is_a?(Expr::RuleCall)
-              result << p
-              result.merge(enter_set(p))
-            end
-          end
-          result
-        end
-      end
+      def call_set(rule_call)
+        @call_fixpoint.calculate(rule_call) do
+          result = Set[[nil, rule_call, rule_call.rule]]
 
-      def alias_set(rule_call)
-        @alias_fixpoint.calculate(rule_call) do
-          result = Set[rule_call.rule]
-          (first_set(rule_call.rule.body) & last_set(rule_call.rule.body)).each do |expr|
-            if expr.is_a?(Expr::RuleCall)
-              result.merge(alias_set(expr))
+          fst = first_set(rule_call.rule.body).grep(Expr::RuleCall)
+          lst = last_set(rule_call.rule.body).grep(Expr::RuleCall)
+
+          fst.each do |expr|
+            call_set(expr).each do |context_rule, cont_expr, invoke_rule|
+              result << [context_rule || rule_call.rule, cont_expr, invoke_rule]
             end
           end
+
+          # Handle aliases
+          (fst & lst).each do |expr|
+            call_set(expr).each do |context_rule, cont_expr, invoke_rule|
+              result << [nil, rule_call, invoke_rule]
+            end
+          end
+
           result
         end
       end
@@ -146,7 +144,7 @@ module Glush
           rules(expr.left) | rules(expr.right)
         when Expr::Plus
           rules(expr.child)
-        when Expr::Eps, Expr::Marker
+        when Expr::Eps
           EMPTY_SET
         when Expr::RuleCall
           @rules_fixpoint.calculate(expr) do
@@ -179,6 +177,25 @@ module Glush
         end
       end
 
+      @direct_rule_children = Hash.new { |h, k|
+        h[k] = @builder.call_set(k)
+          .select { |context_rule, _, _| context_rule.nil? }
+          .map { |_, _, invoke_rule| invoke_rule }
+          .uniq
+      }
+
+      @indirect_rule_children = Hash.new { |h, k|
+        h[k] = @builder.call_set(k)
+          .select { |context_rule, _, _| @direct_rule_children[k].include?(context_rule) }
+          .map { |_, cont_expr, invoke_rule| [cont_expr, invoke_rule] }
+          .uniq
+      }
+
+      @call_set_with_conts = Hash.new do |h, k|
+        h[k] = @builder.call_set(k)
+          .select { |_, cont_expr, _| @transitions[cont_expr].any? }
+      end
+
       @final = Expr::Final.new
 
       @expr_nullable = @builder.nullable(@expr)
@@ -197,14 +214,16 @@ module Glush
       end
 
       entries = initial_entries
+      next_pos = 1
 
       input.each_codepoint do |token|
-        step = Step.new
+        step = Step.new(next_pos)
         process_entries(step, entries, token)
         enter_transitions(step)
         enter_calls(step)
         entries = step.entries
         return false if entries.empty?
+        next_pos += 1
       end
 
       return entries.any? { |entry| entry.terminal == @final }
@@ -213,8 +232,8 @@ module Glush
     Entry = Struct.new(:terminal, :context_set)
 
     def initial_entries
-      step = Step.new
-      context = Context.new
+      step = Step.new(0)
+      context = Context.new(0, nil)
       context_set = Set[context]
       @expr_first.each do |expr|
         accept(step, expr, context_set)
@@ -225,28 +244,24 @@ module Glush
 
     def accept(step, expr, context_set)
       if expr.is_a?(Expr::RuleCall)
-        # Recursive calls:
-        @builder.enter_set(expr).each do |call|
-          @builder.alias_set(call).each do |rule|
-            ctx = step.rule_contexts[rule]
-            ctx.add_callback(call, ctx)
-            step.pending_calls[rule] << ctx
-          end
-        end
+        @call_set_with_conts[expr].each do |context_rule, cont_expr, invoke_rule|
+          ctx = step.rule_contexts[invoke_rule]
 
-        if !@transitions[expr].empty?
-          # Regular call:
-          @builder.alias_set(expr).each do |rule|
-            ctx = step.rule_contexts[rule]
-            ctx.merge_callback(expr, context_set)
-            step.pending_calls[rule] << ctx
+          if context_rule
+            ctx.add_callback(cont_expr, step.rule_contexts[context_rule])
+          else
+            ctx.merge_callback(cont_expr, context_set)
           end
         end
 
         if @in_tail_position[expr]
-          # Tail call invocation:
-          @builder.alias_set(expr).each do |rule|
-            step.pending_calls[rule].merge(context_set)
+          @direct_rule_children[expr].each do |invoke_rule|
+            step.pending_calls[invoke_rule].merge(context_set)
+          end
+
+          @indirect_rule_children[expr].each do |cont_expr, invoke_rule|
+            ctx = step.rule_contexts[invoke_rule]
+            ctx.merge_callback(cont_expr, context_set)
           end
         end
       else
@@ -255,6 +270,12 @@ module Glush
     end
 
     def enter_calls(step)
+      step.rule_contexts.each do |rule, context|
+        if @rule_term_first[rule].any?
+          step.pending_calls[rule] << context
+        end
+      end
+
       step.pending_calls.each do |rule, context_set|
         @rule_term_first[rule].each do |expr|
           step.entries << Entry.new(expr, context_set)
@@ -287,7 +308,11 @@ module Glush
     end
 
     class Context
-      def initialize
+      attr_reader :position, :rule
+
+      def initialize(position, rule)
+        @position = position
+        @rule = rule
         @callback_sets = Hash.new { |h, k| h[k] = Set.new }
       end
 
@@ -307,9 +332,9 @@ module Glush
     class Step
       attr_reader :entries, :pending_calls, :rule_contexts, :pending_transitions
 
-      def initialize
+      def initialize(position)
         @entries = Set.new
-        @rule_contexts = Hash.new { |h, k| h[k] = Context.new }
+        @rule_contexts = Hash.new { |h, k| h[k] = Context.new(position, k) }
         @pending_calls = Hash.new { |h, k| h[k] = Set.new }
         @pending_transitions = Hash.new { |h, k| h[k] = Set.new }
       end

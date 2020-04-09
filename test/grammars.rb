@@ -90,23 +90,23 @@ module TestGrammars
   def manual_expr
     @manual_expr ||= Glush::DSL.build {
       def_rule :add_expr do
-        mark(:add) >> add_expr >> str("+") >> mul_expr |
-        mark(:sub) >> add_expr >> str("-") >> mul_expr |
+        mark(:add) { add_expr >> str("+") >> mul_expr } |
+        mark(:sub) { add_expr >> str("-") >> mul_expr } |
         mul_expr
       end
 
       def_rule :mul_expr do
-        mark(:mul) >> mul_expr >> str("*") >> base |
-        mark(:div) >> mul_expr >> str("/") >> base |
+        mark(:mul) { mul_expr >> str("*") >> base } |
+        mark(:div) { mul_expr >> str("/") >> base } |
         base
       end
 
-      def base
-        mark(:n) >> str("n")
+      def_rule :base, mark: :n do
+        str("n")
       end
 
       def expr
-        add_expr
+       add_expr
       end
 
       expr
@@ -116,12 +116,12 @@ module TestGrammars
   def prec_expr
     @prec_expr ||= Glush::DSL.build {
       prec_rule :expr do |prec|
-        prec.add(9) { mark(:n) >> str("n") }
-        prec.add(1) { mark(:add) >> expr(1) >> str("+") >> expr(2) }
-        prec.add(1) { mark(:sub) >> expr(1) >> str("-") >> expr(2) }
-        prec.add(2) { mark(:mul) >> expr(2) >> str("*") >> expr(3) }
-        prec.add(2) { mark(:div) >> expr(2) >> str("/") >> expr(3) }
-        prec.add(3) { mark(:pow) >> expr(4) >> str("^") >> expr(3) }
+        prec.add(9) { mark(:n) { str("n") } }
+        prec.add(1) { mark(:add) { expr(1) >> str("+") >> expr(2) } }
+        prec.add(1) { mark(:sub) { expr(1) >> str("-") >> expr(2) } }
+        prec.add(2) { mark(:mul) { expr(2) >> str("*") >> expr(3) } }
+        prec.add(2) { mark(:div) { expr(2) >> str("/") >> expr(3) } }
+        prec.add(3) { mark(:pow) { expr(4) >> str("^") >> expr(3) } }
       end
 
       expr
