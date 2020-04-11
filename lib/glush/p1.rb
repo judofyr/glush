@@ -220,64 +220,60 @@ module Glush
         next_pos += 1
       end
 
-      return entries.any? { |expr, entry_set| expr == @final }
+      return entries.has?(@final)
     end
 
     def initial_entries
       step = Step.new(0)
-      entry_set = EntrySet.new
+      context_set = Set[Context.new]
       @expr_first.each do |expr|
-        accept(step, expr, entry_set)
+        accept(step, expr, context_set)
       end
       enter_calls(step)
       step.entries
     end
 
-    def accept(step, expr, entry_set)
+    def accept(step, expr, context_set)
       if expr.is_a?(Expr::RuleCall)
         @call_set_with_conts[expr].each do |context_rule, cont_expr, invoke_rule|
           if context_rule
-            step.calls[invoke_rule] << Entry.new(cont_expr, step.calls[context_rule])
+            step.calls[invoke_rule].add_context(cont_expr, step.calls[context_rule])
           else
-            step.calls[invoke_rule] << Entry.new(cont_expr, entry_set)
+            step.calls[invoke_rule].add_context_set(cont_expr, context_set)
           end
         end
 
         if @in_tail_position[expr]
           @direct_rule_children[expr].each do |invoke_rule|
-            step.tail_calls[invoke_rule] << entry_set
+            step.calls[invoke_rule].merge_context_set(context_set)
           end
         end
       else
-        step.terminals[expr].merge(entry_set)
+        step.terminals.add_context_set(expr, context_set)
       end
     end
 
     def enter_calls(step)
-      step.tail_calls.each do |invoke_rule, entry_sets|
-        entry_sets.each do |entry_set|
-          step.calls[invoke_rule].merge(entry_set)
-        end
-      end
-
-      step.calls.each do |rule, entry_set|
+      step.calls.each do |rule, context|
         @rule_term_first[rule].each do |term|
-          step.terminals[term].merge(entry_set)
+          step.terminals.add_context(term, context)
         end
       end
     end
 
     def process_entries(step, entries, token)
-      entries.each do |expr, entry_set|
+      entries.each do |expr, context_set|
         if ExprMatcher.expr_matches?(expr, token)
           @transitions[expr].each do |next_expr|
-            accept(step, next_expr, entry_set)
+            accept(step, next_expr, context_set)
           end
 
           if @in_tail_position[expr]
-            entry_set.each do |entry|
-              @transitions[entry.expr].each do |next_expr|
-                accept(step, next_expr, entry.entry_set)
+            context_set.each do |context|
+              context.each do |cont_expr, cont_context_set|
+                @transitions[cont_expr].each do |next_expr|
+                  accept(step, next_expr, cont_context_set)
+                end
               end
             end
           end
@@ -285,56 +281,37 @@ module Glush
       end
     end
 
-    Entry = Struct.new(:expr, :entry_set)
-
-    class EntrySet
-      attr_reader :entries
-
+    class Context
       def initialize
-        @entries = nil
-        @borrowed = false
+        @callbacks = Hash.new { |h, k| h[k] = Set.new }
       end
 
-      def <<(entry)
-        if @entries.nil?
-          @entries = Set.new
-        elsif @borrowed
-          @entries = @entries.dup
-          @borrowed = false
-        end
-
-        @entries << entry
+      def add_context(expr, context)
+        @callbacks[expr] << context
       end
-      
-      def merge(other)
-        if @entries.nil?
-          @entries = other.entries
-          @borrowed = true
-          return
-        end
 
-        if @borrowed
-          @entries = @entries | other.entries
-          @borrowed = false
-        else
-          @entries.merge(other.entries)
+      def add_context_set(expr, context_set)
+        @callbacks[expr].merge(context_set)
+      end
+
+      def merge_context_set(context_set)
+        context_set.each do |context|
+          context.each do |cont_expr, cont_context_set| 
+            add_context_set(cont_expr, cont_context_set)
+          end
         end
       end
 
-      def any?
-        @entries.any?
+      def empty?
+        @callbacks.empty?
+      end
+
+      def has?(expr)
+        @callbacks.has_key?(expr)
       end
 
       def each(&blk)
-        @entries.each(&blk)
-      end
-
-      def size
-        if @entries
-          @entries.size
-        else
-          0
-        end
+        @callbacks.each(&blk)
       end
     end
 
@@ -343,9 +320,8 @@ module Glush
 
       def initialize(position)
         @position = position
-        @terminals = Hash.new { |h, k| h[k] = EntrySet.new }
-        @calls = Hash.new { |h, k| h[k] = EntrySet.new }
-        @tail_calls = Hash.new { |h, k| h[k] = Set.new }
+        @terminals = Context.new
+        @calls = Hash.new { |h, k| h[k] = Context.new }
       end
 
       def entries
