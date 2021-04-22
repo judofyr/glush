@@ -42,7 +42,7 @@ module Glush
     def inv(expr)
       case expr
       when Expr::Equal
-        Expr::Less.new(expr.token - 1) | Expr::Greater.new(expr.token + 1)
+        Expr::Less.new(expr.token) | Expr::Greater.new(expr.token)
       when Expr::Conj
         inv(expr.left) | inv(expr.right)
       when Expr::Greater
