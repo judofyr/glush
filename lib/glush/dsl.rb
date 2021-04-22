@@ -43,6 +43,12 @@ module Glush
       case expr
       when Expr::Equal
         Expr::Less.new(expr.token - 1) | Expr::Greater.new(expr.token + 1)
+      when Expr::Conj
+        inv(expr.left) | inv(expr.right)
+      when Expr::Greater
+        Expr::Less.new(expr.token + 1)
+      when Expr::Less
+        Expr::Greater.new(expr.token - 1)
       else
         raise "cannot invert: #{expr.inspect}"
       end
@@ -71,6 +77,10 @@ module Glush
     def def_rule(name, &blk)
       rule = _new_rule(name.to_s, &blk)
       define_singleton_method(name) { rule.call }
+    end
+
+    def plus_boundary(expr)
+      expr.star >> expr.with_next(inv(expr))
     end
 
     def mark(name)

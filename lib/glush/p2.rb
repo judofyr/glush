@@ -567,14 +567,13 @@ module Glush
       end
 
       prev_step = initial_step()
-      next_pos = 0
-
-      input.each_codepoint do |token|
-        return ParseError.new(next_pos - 1) if prev_step.empty?
-        next_pos += 1
-        step = Step.new(next_pos)
+      codepoints = input.codepoints
+      codepoints.each_with_index do |token, pos|
+        return ParseError.new(pos - 1) if prev_step.empty?
+        step = Step.new(pos + 1)
+        next_token = codepoints[pos + 1] || 0
         prev_step.each_active do |activation|
-          process_activation(step, activation, token)
+          process_activation(step, activation, token, next_token)
         end
         prev_step = step
       end
@@ -582,7 +581,7 @@ module Glush
       if prev_step.final_marks
         ParseSuccess.new(prev_step.final_marks)
       else
-        ParseError.new(next_pos)
+        ParseError.new(codepoints.size)
       end
     end
 
@@ -652,9 +651,9 @@ module Glush
       end
     end
 
-    def process_activation(step, activation, token)
+    def process_activation(step, activation, token, next_token)
       state, context, value = *activation
-      if ExprMatcher.expr_matches?(state.terminal, token)
+      if ExprMatcher.expr_matches?(state.terminal, token, next_token)
         state.transitions.each do |t|
           accept(step, t.state, context, t.handler.call(value, step.position))
         end

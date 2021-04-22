@@ -118,6 +118,14 @@ ParserSuite = proc do
     refute_recognize "a#"
   end
 
+  describe(:ident_boundary) do
+    let(:grammar) { TestGrammars.ident_boundary }
+
+    refute_recognize "aa"
+    assert_recognize "a a"
+    assert_recognize "aabsdasd    asd"
+  end
+
   describe("re-used patterns") do
     let(:grammar) do
       Glush::DSL.build {

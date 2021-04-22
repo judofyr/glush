@@ -209,15 +209,15 @@ module Glush
       end
 
       entries = initial_entries
-      next_pos = 1
 
-      input.each_codepoint do |token|
-        step = Step.new(next_pos)
-        process_entries(step, entries, token)
+      codepoints = input.codepoints
+      codepoints.each_with_index do |token, pos|
+        next_token = codepoints[pos + 1] || 0
+        step = Step.new(pos + 1)
+        process_entries(step, entries, token, next_token)
         enter_calls(step)
         entries = step.entries
         return false if entries.empty?
-        next_pos += 1
       end
 
       return entries.has?(@final)
@@ -261,9 +261,9 @@ module Glush
       end
     end
 
-    def process_entries(step, entries, token)
+    def process_entries(step, entries, token, next_token)
       entries.each do |expr, context_set|
-        if ExprMatcher.expr_matches?(expr, token)
+        if ExprMatcher.expr_matches?(expr, token, next_token)
           @transitions[expr].each do |next_expr|
             accept(step, next_expr, context_set)
           end

@@ -36,6 +36,10 @@ module Glush
         (self | Eps.new)
       end
 
+      def with_next(other)
+        WithNext.new(self, other)
+      end
+
       def yield_self_and_children(&blk)
         yield self
         yield_children(&blk)
@@ -63,6 +67,10 @@ module Glush
         @is_terminal = true
       end
 
+      def copy
+        Less.new(token)
+      end
+
       def inspect
         "less(#{token})"
       end
@@ -74,6 +82,10 @@ module Glush
       def initialize(token)
         @token = token
         @is_terminal = true
+      end
+
+      def copy
+        Greater.new(token)
       end
 
       def inspect
@@ -181,6 +193,10 @@ module Glush
         @is_terminal = @left.terminal? && @right.terminal?
       end
 
+      def copy
+        Conj.new(@left, @right)
+      end
+
       def yield_children(&blk)
         @left.yield_self_and_children(&blk)
         @right.yield_self_and_children(&blk)
@@ -188,6 +204,33 @@ module Glush
 
       def inspect
         "conj(#{@left.inspect}, #{@right.inspect})"
+      end
+    end
+
+    class WithNext < Base
+      attr_reader :current_expr, :next_expr
+
+      def initialize(current_expr, next_expr)
+        if !(current_expr.terminal? && next_expr.terminal?)
+          raise ArgumentError, "WithNext can only handle terminals"
+        end
+
+        @current_expr = current_expr.consume!
+        @next_expr = next_expr.consume!
+        @is_terminal = true
+      end
+
+      def copy
+        WithNext.new(@current_expr, @next_expr)
+      end
+
+      def yield_children(&blk)
+        @current_expr.yield_self_and_children(&blk)
+        @next_expr.yield_self_and_children(&blk)
+      end
+
+      def inspect
+        "(#{@current_expr.inspect} -> #{@next_expr.inspect})"
       end
     end
 

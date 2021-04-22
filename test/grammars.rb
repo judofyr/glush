@@ -152,5 +152,23 @@ module TestGrammars
       main
     }
   end
+
+  def ident_boundary
+    @ident_boundary ||= Glush::DSL.build {
+      def_rule :ident do
+        plus_boundary(str("a".."z"))
+      end
+
+      def_rule :_ do
+        str(" ").star
+      end
+
+      def_rule :main do
+        ident >> _ >> ident
+      end
+
+      main
+    }
+  end
 end
 
