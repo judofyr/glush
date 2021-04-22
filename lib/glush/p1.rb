@@ -19,7 +19,7 @@ module Glush
           nullable(expr.left) & nullable(expr.right)
         when Expr::Plus
           nullable(expr.child)
-        when Expr::Eps
+        when Expr::Eps, Expr::Mark
           true
         when Expr::RuleCall
           @nullable_fixpoint.calculate(expr) do
@@ -44,7 +44,7 @@ module Glush
           end
         when Expr::Plus
           first_set(expr.child)
-        when Expr::Eps
+        when Expr::Eps, Expr::Mark
           EMPTY_SET
         when Expr::RuleCall
           Set[expr]
@@ -67,7 +67,7 @@ module Glush
           end
         when Expr::Plus
           last_set(expr.child)
-        when Expr::Eps
+        when Expr::Eps, Expr::Mark
           EMPTY_SET
         when Expr::RuleCall
           Set[expr]
@@ -103,7 +103,7 @@ module Glush
             end
           end
           result
-        when Expr::Eps, Expr::RuleCall
+        when Expr::Eps, Expr::RuleCall, Expr::Mark
           EMPTY_SET
         else
           raise NotImplementedError, "#{expr} not handled"
@@ -146,7 +146,7 @@ module Glush
           rules(expr.left) | rules(expr.right)
         when Expr::Plus
           rules(expr.child)
-        when Expr::Eps
+        when Expr::Eps, Expr::Mark
           EMPTY_SET
         when Expr::RuleCall
           @rules_fixpoint.calculate(expr) do

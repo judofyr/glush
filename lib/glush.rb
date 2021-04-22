@@ -23,12 +23,10 @@ module Glush
   end
 
   class ParseSuccess
-    def initialize(result)
-      @result = result
-    end
+    attr_reader :data
 
-    def marks
-      @result.marks
+    def initialize(data)
+      @data = data
     end
 
     def error?
@@ -42,11 +40,12 @@ module Glush
 
   autoload :DefaultParser, __dir__ + '/glush/default_parser.rb'
   autoload :DSL, __dir__ + '/glush/dsl.rb'
+  autoload :EBNF, __dir__ + '/glush/ebnf.rb'
   autoload :Expr, __dir__ + '/glush/expr.rb'
   autoload :ExprMatcher, __dir__ + '/glush/expr_matcher.rb'
   autoload :FixpointBuilder, __dir__ + '/glush/fixpoint_builder.rb'
-  autoload :List, __dir__ + '/glush/list.rb'
   autoload :MarkProcessor, __dir__ + '/glush/mark_processor.rb'
   autoload :P1, __dir__ + '/glush/p1.rb'
+  autoload :P2, __dir__ + '/glush/p2.rb'
 end
 

@@ -35,6 +35,14 @@ module Glush
       def maybe
         (self | Eps.new)
       end
+
+      def yield_self_and_children(&blk)
+        yield self
+        yield_children(&blk)
+      end
+
+      def yield_children(&nlk)
+      end
     end
 
     class Final < Base
@@ -131,6 +139,11 @@ module Glush
         Alt.new(@left, @right)
       end
 
+      def yield_children(&blk)
+        @left.yield_self_and_children(&blk)
+        @right.yield_self_and_children(&blk)
+      end
+
       def inspect
         "alt(#{@left.inspect}, #{@right.inspect})"
       end
@@ -149,6 +162,11 @@ module Glush
         Seq.new(@left, @right)
       end
 
+      def yield_children(&blk)
+        @left.yield_self_and_children(&blk)
+        @right.yield_self_and_children(&blk)
+      end
+
       def inspect
         "seq(#{@left.inspect}, #{@right.inspect})"
       end
@@ -161,6 +179,11 @@ module Glush
         @left = left.consume!
         @right = right.consume!
         @is_terminal = @left.terminal? && @right.terminal?
+      end
+
+      def yield_children(&blk)
+        @left.yield_self_and_children(&blk)
+        @right.yield_self_and_children(&blk)
       end
 
       def inspect
@@ -176,6 +199,10 @@ module Glush
         @is_terminal = false
       end
 
+      def yield_children(&blk)
+        @child.yield_self_and_children(&blk)
+      end
+
       def copy
         Plus.new(@child)
       end
@@ -185,15 +212,30 @@ module Glush
       end
     end
 
+    class Mark < Base
+      attr_reader :name
+
+      def initialize(name)
+        @name = name
+        @is_terminal = false
+      end
+
+      def copy
+        Mark.new(@name)
+      end
+
+      def inspect
+        "mark(#{@name})"
+      end
+    end
+
     class Rule
       attr_reader :name, :calls
-      attr_accessor :mark
 
       def initialize(name, &blk)
         @name = name
         @code = blk
         @calls = []
-        @mark = nil
       end
 
       def call

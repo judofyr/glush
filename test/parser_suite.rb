@@ -6,20 +6,27 @@ ParserSuite = proc do
   def self.assert_recognize(input)
     it "should recognize" do
       assert parser.recognize?(input), "expected match for input: #{input}"
+      if parser.respond_to?(:parser)
+        refute parser.parse(input).error?, "expected parse to succeed for input: #{input}"
+      end
     end
   end
 
   def self.refute_recognize(input)
     it "should not recognize" do
       refute parser.recognize?(input), "expected no match for input: #{input}"
+
+      if parser.respond_to?(:parser)
+        assert parser.parse(input).error?, "expected parse to fail for input: #{input}"
+      end
     end
   end
 
   def self.assert_marks(input, marks)
     it "should match marks" do
       skip unless parser.respond_to?(:parse)
-      result = parser.parse(input).unwrap
-      assert_equal marks, result.marks.map(&:to_a)
+      success = parser.parse!(input)
+      assert_equal marks, success.data.map(&:to_a)
     end
   end
 
@@ -84,6 +91,7 @@ ParserSuite = proc do
     assert_recognize "n"
     assert_recognize "n+n"
     assert_recognize "n*n"
+    assert_recognize "n+n*n"
     assert_recognize "n+n*n/n-n*n-n"
     refute_recognize "n+n*n/n-nn-n"
 
@@ -238,15 +246,15 @@ ParserSuite = proc do
     let(:grammar) {
       Glush::DSL.build {
         def_rule :a do
-          b >> str("a")
+          mark(:a) >> b >> str("a")
         end
 
         def_rule :b do
-          c >> str("b")
+          c >> str("b") >> mark(:b_done)
         end
 
         def_rule :c do
-          str("c")
+          mark(:c) >> str("c") >> mark(:c_done)
         end
 
         def_rule :a_indirect do
@@ -334,7 +342,7 @@ ParserSuite = proc do
     it "can extract marks from result" do
       result = parser.parse("n*n")
       refute result.error?
-      assert result.marks
+      assert result.data
     end
   }
 end
