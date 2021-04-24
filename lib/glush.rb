@@ -38,6 +38,7 @@ module Glush
     end
   end
 
+  autoload :CLI, __dir__ + '/glush/cli.rb'
   autoload :DefaultParser, __dir__ + '/glush/default_parser.rb'
   autoload :DSL, __dir__ + '/glush/dsl.rb'
   autoload :EBNF, __dir__ + '/glush/ebnf.rb'
@@ -47,5 +48,6 @@ module Glush
   autoload :MarkProcessor, __dir__ + '/glush/mark_processor.rb'
   autoload :P1, __dir__ + '/glush/p1.rb'
   autoload :P2, __dir__ + '/glush/p2.rb'
+  autoload :Utils, __dir__ + '/glush/utils.rb'
 end
 

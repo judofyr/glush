@@ -13,5 +13,7 @@ Gem::Specification.new do |s|
   s.require_paths = %w(lib)
   s.files         = Dir["lib/**/*.rb"]
   s.license       = '0BSD'
+
+  s.add_runtime_dependency "cri", "~> 2.15.0"
 end
 
