@@ -163,7 +163,13 @@ module Glush
           alias_data.each do |expr, data|
             if data[:start].any? && data[:end].any?
               direct_call_set(expr.rule).each do |call|
-                res << DirectCall.new(call.rule, data[:start], data[:end])
+                before = call.before_marks.flat_map do |m1|
+                  data[:start].map { |m2| m1 + m2 }
+                end
+                after = call.after_marks.flat_map do |m1|
+                  data[:end].map { |m2| m1 + m2 }
+                end
+                res << DirectCall.new(call.rule, Set.new(before), Set.new(after))
               end
             end
           end
@@ -314,8 +320,9 @@ module Glush
                 )
               end
 
-              if tag = last_exprs[expr]
-                # TODO: use tag for something?
+              if marks = last_exprs[expr]
+                raise "todo" if !marks.empty?
+
                 builder.direct_call_set(rule).each do |s|
                   if !@rule_start_states[s.rule].empty?
                     state.add_rule(s.rule)
