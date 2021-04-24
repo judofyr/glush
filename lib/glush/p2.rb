@@ -579,8 +579,8 @@ module Glush
         prev_step = step
       end
 
-      if prev_step.final_marks
-        ParseSuccess.new(prev_step.final_marks)
+      if prev_step.final_values.any?
+        ParseSuccess.new(prev_step.final_values[0])
       else
         ParseError.new(codepoints.size)
       end
@@ -627,7 +627,7 @@ module Glush
       when TerminalState
         step.enter_state(state, context, value)
       when FinalState
-        step.final_marks = value
+        step.final_values << value
       else
         raise "unknown state: #{state.class.inspect}"
       end
@@ -712,13 +712,12 @@ module Glush
     Activation = Struct.new(:state, :context, :value)
 
     class Step
-      attr_reader :position, :calls, :contexts
-      attr_accessor :final_marks
+      attr_reader :position, :calls, :contexts, :final_values
 
       def initialize(position)
         @position = position
         @active_set = Hash.new { |h, k| h[k] = [] }
-        @final_marks = nil
+        @final_values = []
         @contexts = Hash.new
         @calls = Set.new
       end
