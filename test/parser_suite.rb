@@ -353,5 +353,32 @@ ParserSuite = proc do
       assert result.data
     end
   }
+
+  describe("prec_nested") do
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :main do
+          mark(:rule) >> ident >> str("=") >> ebnf_pattern
+        end
+
+        prec_rule :ebnf_pattern do |p|
+          p.add(1) { mark(:inv) >> str("!") }
+          p.add(2) { mark(:pident) >> ident }
+        end
+  
+        def_rule :ident do
+          mark(:ident) >> str("a".."z").plus >> mark(:end)
+        end
+  
+        main
+      }
+    }
+
+    assert_marks "a=b", [
+      [:rule, 0],
+        [:ident, 0], [:end, 1],
+        [:pident, 2], [:ident, 2], [:end, 3],
+    ]
+  end
 end
 
