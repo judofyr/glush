@@ -609,18 +609,18 @@ module Glush
       case state
       when CallState
         state.calls.each do |call|
-          inner_context = step.context_for(call.invoke_rule)
+          inner_context = context_for(step, call.invoke_rule)
           register_return(inner_context, context, state, value, call.handler)
         end
 
         state.tail_calls.each do |call|
-          inner_context = step.context_for(call.invoke_rule)
+          inner_context = context_for(step, call.invoke_rule)
           register_tail(inner_context, context, value, call.handler)
         end
 
         state.recursive_calls.each do |rec_call|
-          inner_context = step.context_for(rec_call.invoke_rule)
-          ret_context = step.context_for(rec_call.cont_rule)
+          inner_context = context_for(step, rec_call.invoke_rule)
+          ret_context = context_for(step, rec_call.cont_rule)
           register_return(inner_context, ret_context, rec_call.cont_state, rec_call.initial_value, rec_call.handler)
         end
 
@@ -657,7 +657,7 @@ module Glush
 
     def process_calls(step)
       step.calls.each do |rule|
-        inner_context = step.context_for(rule)
+        inner_context = context_for(step, rule)
         @state_builder.rule_start_states[rule].each do |state_start|
           step.enter_state(state_start.state, inner_context, state_start.handler.call(step.position))
         end
@@ -668,44 +668,47 @@ module Glush
       context.add_return(cont_state, cont_context, value, handler)
     end
 
-    def combined_handlers
-      @combined_handlers ||= Hash.new do |h, k|
-        handler, outer_handler = *k
-        h[k] = proc do |combined_value, before_pos, child_value, after_pos|
-          value, outer_value, pos = combined_value
+    def register_tail(context, caller_context, value, handler)
+      caller_context.each_return do |cont_state, cont_context, outer_value, outer_handler|
+        pos = caller_context.position
+        combined_handler = proc do |v, before_pos, child_value, after_pos|
+          raise "todo" if v.any?
           inner_value = handler.call(value, before_pos, child_value, after_pos)
           outer_handler.call(outer_value, pos, inner_value, after_pos)
         end
+        context.add_return(cont_state, cont_context, [], combined_handler)
       end
     end
 
-    def register_tail(context, caller_context, value, handler)
-      caller_context.each_return do |cont_state, cont_context, outer_value, outer_handler|
-        combined_value = [value, outer_value, caller_context.position]
-        combined_handler = combined_handlers[[handler, outer_handler]]
-        context.add_return(cont_state, cont_context, combined_value, combined_handler)
-      end
-      caller_context.return_set.freeze
+    FST = proc do |values, &blk|
+      blk.call(*values[0])
+    end
+
+    def context_for(step, rule)
+      step.contexts[rule] ||= Context.new(rule, step.position, FST)
     end
 
     class Context
-      attr_reader :return_set, :position
+      attr_reader :position
 
-      Return = Struct.new(:state, :context, :value, :handler)
+      ReturnValue = Struct.new(:value, :handler)
 
-      def initialize(rule, position)
+      def initialize(rule, position, handler)
         @rule = rule
         @position = position
-        @return_set = Set.new
+        @handler = handler
+        @returns = Hash.new { |h, k| h[k] = [] }
       end
 
       def add_return(state, context, value, handler)
-        @return_set << Return.new(state, context, value, handler)
+        @returns[[state, context]] << ReturnValue.new(value, handler)
       end
 
       def each_return
-        @return_set.each do |ret|
-          yield ret.state, ret.context, ret.value, ret.handler
+        @returns.each do |(state, context), values|
+          @handler.call(values) do |value, handler|
+            yield state, context, value, handler
+          end
         end
       end
     end
@@ -713,28 +716,28 @@ module Glush
     Activation = Struct.new(:state, :context, :value)
 
     class Step
-      attr_reader :position, :calls
+      attr_reader :position, :calls, :contexts
       attr_accessor :final_marks
 
       def initialize(position)
         @position = position
-        @active_set = Set.new
+        @active_set = Hash.new { |h, k| h[k] = [] }
         @final_marks = nil
-        @contexts = Hash.new { |h, k| h[k] = Context.new(k, position) }
+        @contexts = Hash.new
         @calls = Set.new
-      end
-
-      def context_for(rule)
-        @contexts[rule]
       end
 
       def enter_state(state, context, value)
         raise TypeError, "expected Context" if context && !context.is_a?(Context)
-        @active_set << Activation.new(state, context, value)
+        @active_set[[state, context]] << value
       end
 
       def each_active(&blk)
-        @active_set.each(&blk)
+        @active_set.each do |(state, context), values|
+          values.each do |value|
+            yield Activation.new(state, context, value)
+          end
+        end
       end
 
       def empty?
