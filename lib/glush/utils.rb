@@ -4,12 +4,20 @@ module Glush
   module Utils
     module_function
 
-    def dump_dot(expr, filename)
-      Open3.popen2("dot", "-Tpng", "-o", filename) do |stdin, stdout|
-        stdout.close
+    def build_dot(filename, &blk)
+      format = filename[/\.([^\.]+)/, 1]
+      Open3.popen2e("dot", "-T#{format}", "-o", filename) do |stdin, stdout, waiter|
+        yield stdin
+        stdin.close
+        out = stdout.read
+        raise "dot error: #{out}" if !waiter.value.success?
+      end
+    end
+
+    def build_dot_expr(expr, filename)
+      build_dot(filename) do |stdin|
         sb = Glush::P2::StateBuilder.new(expr)
         sb.dump_dot(stdin)
-        stdin.close
       end
     end
 

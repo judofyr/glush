@@ -58,14 +58,14 @@ module Glush
         c.subcommand do |c|
           c.name "viz"
           c.summary "produce diagram for grammar"
-          c.usage "viz -g <grammar-file> <png-output-file>"
+          c.usage "viz -g <grammar-file> <output-file>"
 
           c.param :filename
 
           c.run do |opts, args, cmd|
             expr = load_grammar(opts[:grammar])
             filename = args[:filename]
-            Utils.dump_dot(expr, filename)
+            Utils.build_dot_expr(expr, filename)
             puts "#{filename} created."
           end
         end
