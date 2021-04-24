@@ -1,3 +1,3 @@
 module Glush
-  # TODO
+  DefaultParser = P2
 end
