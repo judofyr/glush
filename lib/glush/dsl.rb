@@ -81,8 +81,17 @@ module Glush
       define_singleton_method(name) { rule.call }
     end
 
-    def plus_boundary(expr)
-      expr.star >> expr.with_next(inv(expr))
+    def boundary(expr, boundary)
+      case expr
+      when Expr::Alt
+        boundary(expr.left, boundary) | boundary(expr.right, boundary)
+      when Expr::Seq
+        expr.left >> boundary(expr.right, boundary)
+      when Expr::Plus
+        expr.child.star >> boundary(expr.child, boundary)
+      else
+        expr.with_next(boundary)
+      end
     end
 
     def mark(name)

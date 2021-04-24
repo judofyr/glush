@@ -155,8 +155,10 @@ module TestGrammars
 
   def ident_boundary
     @ident_boundary ||= Glush::DSL.build {
+      char = str("a".."z")
+
       def_rule :ident do
-        plus_boundary(str("a".."z"))
+        boundary(char.plus, inv(char))
       end
 
       def_rule :_ do

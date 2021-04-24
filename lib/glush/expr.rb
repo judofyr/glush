@@ -212,7 +212,7 @@ module Glush
 
       def initialize(current_expr, next_expr)
         if !(current_expr.terminal? && next_expr.terminal?)
-          raise ArgumentError, "WithNext can only handle terminals"
+          raise ArgumentError, "WithNext can only handle terminals, not #{current_expr.class}"
         end
 
         @current_expr = current_expr.consume!

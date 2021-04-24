@@ -105,7 +105,10 @@ module Glush
       end
 
       def_rule :ident do
-        mark(:ident) >> plus_boundary(ident_fst) >> mark(:end)
+        mark(:ident) >> (
+          boundary(ident_fst, inv(ident_rest)) |
+          boundary(ident_fst >> ident_rest.plus, inv(ident_rest))
+        ) >> mark(:end)
       end
 
       def_rule :main do
