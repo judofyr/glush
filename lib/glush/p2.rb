@@ -368,8 +368,8 @@ module Glush
         end
 
         @rule_start_states.each do |rule, starts|
-          starts.each do |state, marks|
-            visit[state]
+          starts.each do |start|
+            visit[start.state]
           end
         end
 
@@ -442,7 +442,7 @@ module Glush
 
     StateTransition = Struct.new(:state, :marks) do
       def handler
-        @handler ||= proc do |value, postition|
+        @handler ||= proc do |value, position|
           value + marks.map { |m| Mark.new(m, position) }
         end
       end
@@ -563,7 +563,7 @@ module Glush
 
     def parse(input)
       if input.empty?
-        return @state_builder.is_nullable ? ParseResult.new([]) : ParseError.new(0)
+        return @state_builder.is_nullable ? ParseSuccess.new([]) : ParseError.new(0)
       end
 
       prev_step = initial_step()
@@ -587,25 +587,6 @@ module Glush
 
     def parse!(input)
       parse(input).unwrap
-    end
-
-    ParseResult = Struct.new(:marks) do
-      def error?
-        false
-      end
-    end
-
-    class ParseError < StandardError
-      attr_reader :position
-
-      def initialize(position)
-        @position = position
-        super("parse error at #{position}")
-      end
-
-      def error?
-        true
-      end
     end
 
     def initial_step()
