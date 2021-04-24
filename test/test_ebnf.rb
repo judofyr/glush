@@ -163,5 +163,19 @@ class TestEBNF < Minitest::Spec
 
     assert_matches "a\nabåbc😀c"
   end
+
+  describe("look ahead") do
+    let(:ebnf) { %{
+      S = ident _ num
+      _ = " "*
+      char = 'a'..'z' | '0'..'9'
+      ident = char+ &!char
+      num = '0'..'9'+
+    } }
+
+    refute_matches "abc05"
+    assert_matches "abc 05"
+    assert_matches "abc05 4"
+  end
 end
 

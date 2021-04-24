@@ -24,7 +24,8 @@ module Glush
 
       prec_rule :ebnf_pattern do |p|
         p.add(1)  { mark(:alt) >> ebnf_pattern(1) >> ign >> str("|") >> ign >> ebnf_pattern(2) }
-        p.add(2)  { mark(:seq) >> ebnf_pattern(2) >> ign >> (str(",") >> ign).maybe >> ebnf_pattern(3) }
+        p.add(2)  { mark(:seq) >> ebnf_pattern(3) >> ign >> (str(",") >> ign).maybe >> ebnf_pattern(2) }
+        p.add(2)  { mark(:ahead) >> ebnf_pattern(2) >> ign >> str("&") >> ign >> ebnf_pattern(3) }
 
         p.add(3)  { mark(:opt) >> postfix_pattern("?", 4) }
         p.add(3)  { mark(:plus) >> postfix_pattern("+", 4) }
@@ -138,11 +139,15 @@ module Glush
         when :call
           @calls.fetch(ast[1]).call
         when :inv
-          @dsl.inv(compile_pattern(ast[1]))
+          @dsl.inv(@dsl.inline(compile_pattern(ast[1])))
         when :call_level
           builder = @precs.fetch(ast[1])
           level = builder.resolve_level(ast[2])
           builder.call_for(level)
+        when :ahead
+          left = @dsl.inline(compile_pattern(ast[1]))
+          right = @dsl.inline(compile_pattern(ast[2]))
+          @dsl.boundary(left, right)
         else
           raise "unknown type: #{ast[0]}"
         end
@@ -156,6 +161,12 @@ module Glush
         left = process
         right = process
         [:send, left, :>>, right]
+      end
+
+      def process_ahead(mark)
+        left = process
+        right = process
+        [:ahead, left, right]
       end
 
       def process_alt(mark)

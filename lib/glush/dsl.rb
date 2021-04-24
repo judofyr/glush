@@ -98,6 +98,26 @@ module Glush
       Expr::Mark.new(name)
     end
 
+    def inline(expr, calls = Set.new)
+      case expr
+      when Expr::RuleCall
+        if calls.include?(expr.rule)
+          raise "cannot inline recursive call: #{expr.inspect}"
+        end
+        calls << expr.rule
+        inline(expr.rule.body, calls)
+      when Expr::Plus
+        Expr::Plus.new(inline(expr.child, calls))
+      when Expr::Conj, Expr::Alt, Expr::Seq
+        expr.class.new(inline(expr.left, calls), inline(expr.right, calls))
+      when Expr::Mark, Expr::Eps
+        expr
+      else
+        return expr if expr.terminal?
+        raise "unknown expr: #{expr.class}"
+      end
+    end
+
     class PrecBuilder
       def initialize(grammar, name)
         @alternatives = Hash.new { |h, k| h[k] = [] }
