@@ -429,8 +429,8 @@ module Glush
               w.puts "#{node_id[call]} [label=\"tail #{dot_escape(call.invoke_rule.name)}\"]"
             end
           when TerminalState
-            shape = state.last_marks ? "doublecircle" : "circle"
-            w.puts "#{node_id[state]} [shape=#{shape} label=\"#{dot_escape(state.terminal.inspect)}\"]"
+            per = "peripheries=2" if state.last_marks
+            w.puts "#{node_id[state]} [shape=box #{per} label=\"#{dot_escape(state.terminal.inspect)}\"]"
           when FinalState
             w.puts "#{node_id[state]} [shape=doublecircle label=\"\"]"
             next
