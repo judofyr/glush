@@ -575,6 +575,7 @@ module Glush
         prev_step.each_active do |activation|
           process_activation(step, activation, token, next_token)
         end
+        process_calls(step)
         prev_step = step
       end
 
@@ -595,6 +596,7 @@ module Glush
       @state_builder.initial_states.each do |state, tag|
         accept(step, state, nil, marks)
       end
+      process_calls(step)
       step
     end
 
@@ -618,10 +620,7 @@ module Glush
         end
 
         state.rules.each do |rule|
-          inner_context = step.context_for(rule)
-          @state_builder.rule_start_states[rule].each do |state_start|
-            step.enter_state(state_start.state, inner_context, state_start.handler.call(step.position))
-          end
+          step.calls << rule
         end
       when TerminalState
         step.enter_state(state, context, value)
@@ -651,18 +650,34 @@ module Glush
       end
     end
 
+    def process_calls(step)
+      step.calls.each do |rule|
+        inner_context = step.context_for(rule)
+        @state_builder.rule_start_states[rule].each do |state_start|
+          step.enter_state(state_start.state, inner_context, state_start.handler.call(step.position))
+        end
+      end
+    end
+
     def register_return(context, cont_context, cont_state, value, handler)
       context.add_return(cont_state, cont_context, value, handler)
     end
 
+    def combined_handlers
+      @combined_handlers ||= Hash.new do |h, k|
+        handler, outer_handler = *k
+        h[k] = proc do |combined_value, before_pos, child_value, after_pos|
+          value, outer_value, pos = combined_value
+          inner_value = handler.call(value, before_pos, child_value, after_pos)
+          outer_handler.call(outer_value, pos, inner_value, after_pos)
+        end
+      end
+    end
+
     def register_tail(context, caller_context, value, handler)
       caller_context.each_return do |cont_state, cont_context, outer_value, outer_handler|
-        combined_value = [value, outer_value]
-        combined_handler = proc do |combined_value, before_pos, child_value, after_pos|
-          value, outer_value = combined_value
-          inner_value = handler.call(value, before_pos, child_value, after_pos)
-          outer_handler.call(outer_value, caller_context.position, inner_value, after_pos)
-        end
+        combined_value = [value, outer_value, caller_context.position]
+        combined_handler = combined_handlers[[handler, outer_handler]]
         context.add_return(cont_state, cont_context, combined_value, combined_handler)
       end
       caller_context.return_set.freeze
@@ -693,7 +708,7 @@ module Glush
     Activation = Struct.new(:state, :context, :value)
 
     class Step
-      attr_reader :position
+      attr_reader :position, :calls
       attr_accessor :final_marks
 
       def initialize(position)
@@ -701,6 +716,7 @@ module Glush
         @active_set = Set.new
         @final_marks = nil
         @contexts = Hash.new { |h, k| h[k] = Context.new(k, position) }
+        @calls = Set.new
       end
 
       def context_for(rule)
