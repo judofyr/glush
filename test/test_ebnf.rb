@@ -33,7 +33,7 @@ class TestEBNF < Minitest::Spec
     it "should match marks" do
       result = parser.parse(input)
       refute result.error?, "expected match for input: #{input}"
-      assert_equal result.marks.map(&:to_a), marks
+      assert_equal result.data.map(&:to_a), marks
     end
   end
 
@@ -152,6 +152,7 @@ class TestEBNF < Minitest::Spec
     assert_matches "0"
     assert_matches "1"
     assert_matches "8"
+    assert_matches "9"
     refute_matches "a"
   end
 
