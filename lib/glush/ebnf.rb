@@ -301,7 +301,7 @@ module Glush
         name = process
 
         builder = @precs[name] = Glush::DSL::PrecBuilder.new(@dsl, name)
-        while next_mark.name == :prec_branch
+        while next_mark && next_mark.name == :prec_branch
           proc {
             # We need this because of closures
             shift
