@@ -382,6 +382,10 @@ module Glush
           !seen.include?(state)
         end
       end
+      
+      def dot_escape(str)
+        str.gsub(/([\\"])/) { "\\#{$1}" }
+      end
 
       public \
       def dump_dot(w)
@@ -390,7 +394,7 @@ module Glush
 
         w.puts "digraph glush {"
         rules.each do |rule|
-          w.puts "#{node_id[rule]} [shape=box label=\"#{rule.name}\"]"
+          w.puts "#{node_id[rule]} [shape=box label=\"#{dot_escape(rule.name)}\"]"
 
           rule_start_states[rule].each do |state_start|
             w.puts "#{node_id[rule]} -> #{node_id[state_start.state]} [style=dotted]"
@@ -406,15 +410,15 @@ module Glush
         states.each_value do |state|
           case state
           when CallState
-            w.puts "#{node_id[state]} [label=\"#{state.rule_call.inspect}\"]"
+            w.puts "#{node_id[state]} [label=\"#{dot_escape(state.rule_call.inspect)}\"]"
             state.calls.each do |call|
               w.puts "#{node_id[state]} -> #{node_id[call]} [style=dotted]"
-              w.puts "#{node_id[call]} [label=\"call #{call.invoke_rule.name}\"]"
+              w.puts "#{node_id[call]} [label=\"call #{dot_escape(call.invoke_rule.name)}\"]"
             end
 
             state.recursive_calls.each do |rec_call|
               w.puts "#{node_id[state]} -> #{node_id[rec_call]} [style=dotted]"
-              w.puts "#{node_id[rec_call]} [label=\"start #{rec_call.invoke_rule.name}\n as #{rec_call.cont_rule.name}\"]"
+              w.puts "#{node_id[rec_call]} [label=\"start #{dot_escape(rec_call.invoke_rule.name)}\n as #{dot_escape(rec_call.cont_rule.name)}\"]"
               rec_call.cont_state.transitions.each do |t|
                 w.puts "#{node_id[rec_call]} -> #{node_id[t.state]}"
               end
@@ -422,11 +426,11 @@ module Glush
 
             state.tail_calls.each do |call|
               w.puts "#{node_id[state]} -> #{node_id[call]} [style=dotted]"
-              w.puts "#{node_id[call]} [label=\"tail #{call.invoke_rule.name}\"]"
+              w.puts "#{node_id[call]} [label=\"tail #{dot_escape(call.invoke_rule.name)}\"]"
             end
           when TerminalState
             shape = state.last_marks ? "doublecircle" : "circle"
-            w.puts "#{node_id[state]} [shape=#{shape} label=\"#{state.terminal.inspect}\"]"
+            w.puts "#{node_id[state]} [shape=#{shape} label=\"#{dot_escape(state.terminal.inspect)}\"]"
           when FinalState
             w.puts "#{node_id[state]} [shape=doublecircle label=\"\"]"
             next

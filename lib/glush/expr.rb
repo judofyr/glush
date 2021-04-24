@@ -72,7 +72,7 @@ module Glush
       end
 
       def inspect
-        "less(#{token})"
+        "less(#{Utils.inspect_char(token)})"
       end
     end
 
@@ -89,7 +89,7 @@ module Glush
       end
 
       def inspect
-        "greater(#{token})"
+        "greater(#{Utils.inspect_char(token)})"
       end
     end
 
@@ -106,7 +106,7 @@ module Glush
       end
 
       def inspect
-        "eq(#{token.chr})"
+        "eq(#{Utils.inspect_char(token)})"
       end
     end
 

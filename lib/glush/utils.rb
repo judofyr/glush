@@ -12,5 +12,11 @@ module Glush
         stdin.close
       end
     end
+
+    def inspect_char(code)
+      chr = code.chr
+      return '" "' if chr == " "
+      chr.inspect[1...-1]
+    end
   end
 end
