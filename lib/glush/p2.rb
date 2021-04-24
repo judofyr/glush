@@ -237,6 +237,10 @@ module Glush
           h[k] = Expr::RuleCall === k ? CallState.new(k) : TerminalState.new(k)
         end
         @states[nil] = FinalState.instance
+        @actions = Hash.new do |h, k|
+          klass, *args = *k
+          h[k] = klass.new(*args)
+        end
 
         @rule_start_states = Hash.new { |h, k| h[k] = [] }
         @initial_states = []
@@ -253,7 +257,9 @@ module Glush
         m.to_a[0]
       end
 
-      ID = proc { |v, pos| v }
+      def find_action(*args)
+        @actions[args]
+      end
 
       def build(expr)
         builder = Builder.new
@@ -302,7 +308,8 @@ module Glush
                   state.add_rule(s.rule)
                 end
 
-                state.add_call(s.rule, marks_set(s.before_marks), marks_set(s.after_marks))
+                action = find_action(DirectCallAction, s.rule, marks_set(s.before_marks), marks_set(s.after_marks))
+                state.add_action(action)
               end
 
               builder.start_call_set(rule).each do |s|
@@ -313,11 +320,12 @@ module Glush
                   state.add_rule(s.invoke_rule)
                 end
 
-                state.add_recursive_call(
+                action = find_action(RecCallAction,
                   s.invoke_rule, s.cont_rule, next_state,
                   marks_set(s.before_marks),
                   marks_set(s.after_marks),
                 )
+                state.add_action(action)
               end
 
               if marks = last_exprs[expr]
@@ -325,7 +333,8 @@ module Glush
                   if !@rule_start_states[s.rule].empty?
                     state.add_rule(s.rule)
                   end
-                  state.add_tail_call(s.rule, marks_set(s.before_marks), marks_set(s.after_marks) + marks)
+                  action = find_action(TailCallAction, s.rule, marks_set(s.before_marks), marks_set(s.after_marks) + marks)
+                  state.add_action(action)
                 end
               end
             else
@@ -356,9 +365,11 @@ module Glush
               visit[t.state]
             end
 
-            state.recursive_calls.each do |rec_call|
-              rec_call.cont_state.transitions.each do |t|
-                visit[t.state]
+            state.actions.each do |action|
+              if action.is_a?(RecCallAction)
+                action.cont_state.transitions.each do |t|
+                  visit[t.state]
+                end
               end
             end
           when TerminalState
@@ -407,26 +418,26 @@ module Glush
           w.puts "#{node_id[initial]} -> #{node_id[state]} [style=dotted]"
         end
 
+        @actions.each_value do |action|
+          case action
+          when DirectCallAction
+            w.puts "#{node_id[action]} [label=\"call #{dot_escape(action.invoke_rule.name)}\"]"
+          when TailCallAction
+            w.puts "#{node_id[action]} [label=\"tail #{dot_escape(action.invoke_rule.name)}\"]"
+          when RecCallAction
+            w.puts "#{node_id[action]} [label=\"start #{dot_escape(action.invoke_rule.name)}\n as #{dot_escape(action.cont_rule.name)}\"]"
+            action.cont_state.transitions.each do |t|
+              w.puts "#{node_id[action]} -> #{node_id[t.state]}"
+            end
+          end
+        end
+
         states.each_value do |state|
           case state
           when CallState
             w.puts "#{node_id[state]} [label=\"#{dot_escape(state.rule_call.inspect)}\"]"
-            state.calls.each do |call|
-              w.puts "#{node_id[state]} -> #{node_id[call]} [style=dotted]"
-              w.puts "#{node_id[call]} [label=\"call #{dot_escape(call.invoke_rule.name)}\"]"
-            end
-
-            state.recursive_calls.each do |rec_call|
-              w.puts "#{node_id[state]} -> #{node_id[rec_call]} [style=dotted]"
-              w.puts "#{node_id[rec_call]} [label=\"start #{dot_escape(rec_call.invoke_rule.name)}\n as #{dot_escape(rec_call.cont_rule.name)}\"]"
-              rec_call.cont_state.transitions.each do |t|
-                w.puts "#{node_id[rec_call]} -> #{node_id[t.state]}"
-              end
-            end
-
-            state.tail_calls.each do |call|
-              w.puts "#{node_id[state]} -> #{node_id[call]} [style=dotted]"
-              w.puts "#{node_id[call]} [label=\"tail #{dot_escape(call.invoke_rule.name)}\"]"
+            state.actions.each do |action|
+              w.puts "#{node_id[state]} -> #{node_id[action]} [style=dotted]"
             end
           when TerminalState
             per = "peripheries=2" if state.last_marks
@@ -465,20 +476,61 @@ module Glush
       end
     end
 
+    class CallAction
+      attr_reader :invoke_rule, :before_marks, :after_marks
+
+      def initialize(invoke_rule, before_marks, after_marks)
+        @invoke_rule = invoke_rule
+        @before_marks = before_marks
+        @after_marks = after_marks
+      end
+
+      def handler
+        @handler ||= proc do |before_value, before_pos, child_value, after_pos|
+          before_value +
+            before_marks.map { |m| Mark.new(m, before_pos) } +
+            child_value +
+            after_marks.map { |m| Mark.new(m, after_pos) }
+        end
+      end
+    end
+
+    class DirectCallAction < CallAction
+    end
+
+    class TailCallAction < CallAction
+    end
+
+    class RecCallAction
+      attr_reader :invoke_rule, :cont_rule, :cont_state, :before_marks, :after_marks
+
+      def initialize(invoke_rule, cont_rule, cont_state, before_marks, after_marks)
+        @invoke_rule = invoke_rule
+        @cont_rule = cont_rule
+        @cont_state = cont_state
+        @before_marks = before_marks
+        @after_marks = after_marks
+      end
+
+      def handler
+        @handler ||= proc do |before_pos, child_value, after_pos|
+          before_marks.map { |m| Mark.new(m, before_pos) } +
+            child_value +
+            after_marks.map { |m| Mark.new(m, after_pos) }
+        end
+      end
+    end
+
     class CallState
       attr_reader :rule_call
       attr_reader :rules
-      attr_reader :calls
-      attr_reader :recursive_calls
-      attr_reader :tail_calls
+      attr_reader :actions
       attr_reader :transitions
 
       def initialize(rule_call)
         @rule_call = rule_call
         @rules = []
-        @calls = []
-        @recursive_calls = []
-        @tail_calls = []
+        @actions = []
         @transitions = []
       end
 
@@ -490,37 +542,8 @@ module Glush
         @rules << rule
       end
 
-      Call = Struct.new(:invoke_rule, :before_marks, :after_marks) do
-        def handler
-          @handler ||= proc do |before_value, before_pos, child_value, after_pos|
-            before_value +
-              before_marks.map { |m| Mark.new(m, before_pos) } +
-              child_value +
-              after_marks.map { |m| Mark.new(m, after_pos) }
-          end
-        end
-      end
-
-      RecursiveCall = Struct.new(:invoke_rule, :cont_rule, :cont_state, :before_marks, :after_marks) do
-        def handler
-          @handler ||= proc do |before_pos, child_value, after_pos|
-            before_marks.map { |m| Mark.new(m, before_pos) } +
-              child_value +
-              after_marks.map { |m| Mark.new(m, after_pos) }
-          end
-        end
-      end
-
-      def add_call(*args)
-        @calls << Call.new(*args)
-      end
-
-      def add_tail_call(*args)
-        @tail_calls << Call.new(*args)
-      end
-
-      def add_recursive_call(*args)
-        @recursive_calls << RecursiveCall.new(*args)
+      def add_action(action)
+        @actions << action
       end
 
       def add_transition(state, marks)
@@ -607,22 +630,21 @@ module Glush
     def accept(step, state, context, value)
       case state
       when CallState
-        state.calls.each do |call|
-          inner_context = context_for(step, call.invoke_rule)
-          handler = proc { |*args| call.handler.call(value, *args) }
-          register_return(inner_context, context, state, handler)
-        end
-
-        state.tail_calls.each do |call|
-          inner_context = context_for(step, call.invoke_rule)
-          handler = proc { |*args| call.handler.call(value, *args) }
-          register_tail(inner_context, context, handler)
-        end
-
-        state.recursive_calls.each do |rec_call|
-          inner_context = context_for(step, rec_call.invoke_rule)
-          ret_context = context_for(step, rec_call.cont_rule)
-          register_return(inner_context, ret_context, rec_call.cont_state, rec_call.handler)
+        state.actions.each do |action|
+          case action
+          when TailCallAction
+            inner_context = context_for(step, action.invoke_rule)
+            handler = proc { |*args| action.handler.call(value, *args) }
+            register_tail(inner_context, context, handler)
+          when DirectCallAction
+            inner_context = context_for(step, action.invoke_rule)
+            handler = proc { |*args| action.handler.call(value, *args) }
+            register_return(inner_context, context, state, handler)
+          when RecCallAction
+            inner_context = context_for(step, action.invoke_rule)
+            ret_context = context_for(step, action.cont_rule)
+            register_return(inner_context, ret_context, action.cont_state, action.handler)
+          end
         end
 
         state.rules.each do |rule|
