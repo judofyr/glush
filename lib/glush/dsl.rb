@@ -33,7 +33,7 @@ module Glush
           raise GrammarError, "invalid range"
         end
 
-        Expr::Greater.new(a_num - 1) & Expr::Less.new(b_num - 1)
+        Expr::Greater.new(a_num - 1) & Expr::Less.new(b_num + 1)
       else
         raise GrammarError, "unsupported type: #{text.inspect}"
       end
@@ -45,6 +45,8 @@ module Glush
         Expr::Less.new(expr.token) | Expr::Greater.new(expr.token)
       when Expr::Conj
         inv(expr.left) | inv(expr.right)
+      when Expr::Alt
+        inv(expr.left) & inv(expr.right)
       when Expr::Greater
         Expr::Less.new(expr.token + 1)
       when Expr::Less
