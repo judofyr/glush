@@ -321,13 +321,11 @@ module Glush
               end
 
               if marks = last_exprs[expr]
-                raise "todo" if !marks.empty?
-
                 builder.direct_call_set(rule).each do |s|
                   if !@rule_start_states[s.rule].empty?
                     state.add_rule(s.rule)
                   end
-                  state.add_tail_call(s.rule, marks_set(s.before_marks), marks_set(s.after_marks))
+                  state.add_tail_call(s.rule, marks_set(s.before_marks), marks_set(s.after_marks) + marks)
                 end
               end
             else

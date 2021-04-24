@@ -380,5 +380,25 @@ ParserSuite = proc do
         [:pident, 2], [:ident, 2], [:end, 3],
     ]
   end
+
+  describe("marks after last call") do
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :a do
+          str("a")
+        end
+
+        def_rule :main do
+          str("b") >> a >> mark(:done)
+        end
+
+        main
+      }
+    }
+
+    assert_marks "ba", [
+      [:done, 2]
+    ]
+  end
 end
 
