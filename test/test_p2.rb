@@ -177,7 +177,7 @@ class TestP2Builder < Minitest::Spec
 end
 
 class TestP2Parser < Minitest::Spec
-  instance_eval &ParserSuite
+  instance_eval(&ParserSuite)
   
   def create_parser(pattern)
     Glush::P2.new(pattern)

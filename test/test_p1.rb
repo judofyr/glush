@@ -64,7 +64,7 @@ class TestP1 < Minitest::Spec
 end
 
 class TestP1Parser < Minitest::Spec
-  instance_eval &ParserSuite
+  instance_eval(&ParserSuite)
   
   def create_parser(pattern)
     Glush::P1.new(pattern)
