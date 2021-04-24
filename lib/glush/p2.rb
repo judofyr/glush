@@ -488,8 +488,8 @@ module Glush
 
       Call = Struct.new(:invoke_rule, :before_marks, :after_marks) do
         def handler
-          @handler ||= proc do |start_value, before_pos, child_value, after_pos|
-            start_value +
+          @handler ||= proc do |before_value, before_pos, child_value, after_pos|
+            before_value +
               before_marks.map { |m| Mark.new(m, before_pos) } +
               child_value +
               after_marks.map { |m| Mark.new(m, after_pos) }
@@ -499,16 +499,11 @@ module Glush
 
       RecursiveCall = Struct.new(:invoke_rule, :cont_rule, :cont_state, :before_marks, :after_marks) do
         def handler
-          @handler ||= proc do |start_value, before_pos, child_value, after_pos|
-            start_value +
-              before_marks.map { |m| Mark.new(m, before_pos) } +
+          @handler ||= proc do |before_pos, child_value, after_pos|
+            before_marks.map { |m| Mark.new(m, before_pos) } +
               child_value +
               after_marks.map { |m| Mark.new(m, after_pos) }
           end
-        end
-
-        def initial_value
-          []
         end
       end
 
@@ -610,18 +605,20 @@ module Glush
       when CallState
         state.calls.each do |call|
           inner_context = context_for(step, call.invoke_rule)
-          register_return(inner_context, context, state, value, call.handler)
+          handler = proc { |*args| call.handler.call(value, *args) }
+          register_return(inner_context, context, state, handler)
         end
 
         state.tail_calls.each do |call|
           inner_context = context_for(step, call.invoke_rule)
-          register_tail(inner_context, context, value, call.handler)
+          handler = proc { |*args| call.handler.call(value, *args) }
+          register_tail(inner_context, context, handler)
         end
 
         state.recursive_calls.each do |rec_call|
           inner_context = context_for(step, rec_call.invoke_rule)
           ret_context = context_for(step, rec_call.cont_rule)
-          register_return(inner_context, ret_context, rec_call.cont_state, rec_call.initial_value, rec_call.handler)
+          register_return(inner_context, ret_context, rec_call.cont_state, rec_call.handler)
         end
 
         state.rules.each do |rule|
@@ -645,8 +642,8 @@ module Glush
 
         if last_handler = state.last_handler
           inner_value = last_handler.call(value, step.position)
-          context.each_return do |cont_state, cont_context, value, handler|
-            new_value = handler.call(value, context.position, inner_value, step.position)
+          context.each_return do |cont_state, cont_context, handler|
+            new_value = handler.call(context.position, inner_value, step.position)
             cont_state.transitions.each do |t|
               accept(step, t.state, cont_context, t.handler.call(new_value, step.position))
             end
@@ -664,24 +661,23 @@ module Glush
       end
     end
 
-    def register_return(context, cont_context, cont_state, value, handler)
-      context.add_return(cont_state, cont_context, value, handler)
+    def register_return(context, cont_context, cont_state, handler)
+      context.add_return(cont_state, cont_context, handler)
     end
 
-    def register_tail(context, caller_context, value, handler)
-      caller_context.each_return do |cont_state, cont_context, outer_value, outer_handler|
+    def register_tail(context, caller_context, handler)
+      caller_context.each_return do |cont_state, cont_context, outer_handler|
         pos = caller_context.position
-        combined_handler = proc do |v, before_pos, child_value, after_pos|
-          raise "todo" if v.any?
-          inner_value = handler.call(value, before_pos, child_value, after_pos)
-          outer_handler.call(outer_value, pos, inner_value, after_pos)
+        combined_handler = proc do |before_pos, child_value, after_pos|
+          inner_value = handler.call(before_pos, child_value, after_pos)
+          outer_handler.call(pos, inner_value, after_pos)
         end
-        context.add_return(cont_state, cont_context, [], combined_handler)
+        context.add_return(cont_state, cont_context, combined_handler)
       end
     end
 
-    FST = proc do |values, &blk|
-      blk.call(*values[0])
+    FST = proc do |handlers, &blk|
+      blk.call(handlers[0])
     end
 
     def context_for(step, rule)
@@ -700,14 +696,14 @@ module Glush
         @returns = Hash.new { |h, k| h[k] = [] }
       end
 
-      def add_return(state, context, value, handler)
-        @returns[[state, context]] << ReturnValue.new(value, handler)
+      def add_return(state, context, handler)
+        @returns[[state, context]] << handler
       end
 
       def each_return
-        @returns.each do |(state, context), values|
-          @handler.call(values) do |value, handler|
-            yield state, context, value, handler
+        @returns.each do |(state, context), handlers|
+          @handler.call(handlers) do |handler|
+            yield state, context, handler
           end
         end
       end
