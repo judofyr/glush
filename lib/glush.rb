@@ -46,6 +46,7 @@ module Glush
   autoload :ExprMatcher, __dir__ + '/glush/expr_matcher.rb'
   autoload :FixpointBuilder, __dir__ + '/glush/fixpoint_builder.rb'
   autoload :MarkProcessor, __dir__ + '/glush/mark_processor.rb'
+  autoload :PartitionRefinement, __dir__ + '/glush/partition_refinement.rb'
   autoload :P1, __dir__ + '/glush/p1.rb'
   autoload :P2, __dir__ + '/glush/p2.rb'
   autoload :Utils, __dir__ + '/glush/utils.rb'
