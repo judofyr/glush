@@ -1,4 +1,11 @@
 #!/usr/bin/env ruby
 
+if File.exists?(__dir__ + '/../Gemfile.lock')
+  begin
+    require 'bundler/setup'
+  rescue LoadError
+  end
+end
+
 require_relative '../lib/glush'
 Glush::CLI.run
