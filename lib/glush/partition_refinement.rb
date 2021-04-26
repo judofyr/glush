@@ -6,6 +6,12 @@ module Glush
       def initialize(elements)
         @elements = elements
       end
+
+      include Enumerable
+
+      def each(&blk)
+        @elements.each(&blk)
+      end
     end
 
     def initialize(*args)
