@@ -400,5 +400,34 @@ ParserSuite = proc do
       [:done, 2]
     ]
   end
+
+  describe("nested marks in calls") {
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :a do
+          mark(:a) >> str("a") >> mark(:a2)
+        end
+
+        def_rule :b do
+          mark(:b) >> a >> mark(:b2)
+        end
+
+        def_rule :c do
+          mark(:c) >> b >> mark(:c2)
+        end
+
+        c
+      }
+    }
+
+    assert_marks "a", [
+      [:c, 0],
+      [:b, 0],
+      [:a, 0],
+      [:a2, 1],
+      [:b2, 1],
+      [:c2, 1],
+    ]
+  }
 end
 

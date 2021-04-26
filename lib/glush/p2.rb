@@ -164,7 +164,7 @@ module Glush
             if data[:start].any? && data[:end].any?
               direct_call_set(expr.rule).each do |call|
                 before = call.before_marks.flat_map do |m1|
-                  data[:start].map { |m2| m1 + m2 }
+                  data[:start].map { |m2| m2 + m1 }
                 end
                 after = call.after_marks.flat_map do |m1|
                   data[:end].map { |m2| m1 + m2 }
