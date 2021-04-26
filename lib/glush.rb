@@ -11,6 +11,7 @@ module Glush
 
     def initialize(position)
       @position = position
+      super("parse error at #{position}")
     end
 
     def error?
