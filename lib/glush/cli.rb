@@ -56,6 +56,20 @@ module Glush
         end
 
         c.subcommand do |c|
+          c.name "gen-js"
+          c.summary "generate JavaScript parser"
+          c.usage "gen-js -g <grammar-file>"
+
+          c.no_params
+
+          c.run do |opts, args, cmd|
+            expr = load_grammar(opts[:grammar])
+            gen = JavaScriptGenerator.new(expr, export: :esm)
+            gen.write($stdout)
+          end
+        end
+
+        c.subcommand do |c|
           c.name "viz"
           c.summary "produce diagram for grammar"
           c.usage "viz -g <grammar-file> <output-file>"

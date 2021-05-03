@@ -250,6 +250,16 @@ module Glush
         clear_unused_states
       end
 
+      def each_state(&blk)
+        @states.each_value(&blk)
+      end
+
+      def each_call_state
+        each_state do |state|
+          yield state if state.is_a?(CallState)
+        end
+      end
+
       private
 
       def marks_set(m)
@@ -367,9 +377,7 @@ module Glush
 
             state.actions.each do |action|
               if action.is_a?(RecCallAction)
-                action.cont_state.transitions.each do |t|
-                  visit[t.state]
-                end
+                visit[action.cont_state]
               end
             end
           when TerminalState
@@ -529,7 +537,7 @@ module Glush
 
       def initialize(rule_call)
         @rule_call = rule_call
-        @rules = []
+        @rules = Set.new
         @actions = []
         @transitions = []
       end
@@ -581,6 +589,10 @@ module Glush
     class FinalState
       def self.instance
         @instance ||= new
+      end
+
+      def transitions
+        []
       end
     end
 
