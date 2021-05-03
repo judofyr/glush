@@ -1,21 +1,13 @@
 module Glush
   class EBNF
-    Grammar = ::Glush::Grammar.new {
+    Grammar = DSL.build {
       def_rule :ebnf_rule do
-        mark(:rule) >> ident >> ign >> ebnf_rule_sep >> ign >> (str("|") >> ign).maybe >> ebnf_pattern >> (ign >> guard).maybe |
-        mark(:prec_rule) >> ident >> ign >> ebnf_rule_sep >> ign >> ebnf_prec_branches >> (ign >> guard).maybe
-      end
-
-      def guard
-        str("@guard(") >> ign >> mark(:guard) >> ebnf_pattern >> ign >> str(")")
+        mark(:rule) >> ident >> ign >> ebnf_rule_sep >> ign >> (str("|") >> ign).maybe >> ebnf_pattern |
+        mark(:prec_rule) >> ident >> ign >> ebnf_rule_sep >> ign >> ebnf_prec_branches
       end
 
       def ebnf_rule_sep
         str(":") | str(":=") | str("::=") | str("=")
-      end
-
-      def ebnf_rule_end
-        str(";") | str(".")
       end
 
       def braced_pattern(l, r)
@@ -32,7 +24,8 @@ module Glush
 
       prec_rule :ebnf_pattern do |p|
         p.add(1)  { mark(:alt) >> ebnf_pattern(1) >> ign >> str("|") >> ign >> ebnf_pattern(2) }
-        p.add(2)  { mark(:seq) >> ebnf_pattern(2) >> ign >> (str(",") >> ign).maybe >> ebnf_pattern(3) }
+        p.add(2)  { mark(:seq) >> ebnf_pattern(3) >> ign >> (str(",") >> ign).maybe >> ebnf_pattern(2) }
+        p.add(2)  { mark(:ahead) >> ebnf_pattern(2) >> ign >> str("&") >> ign >> ebnf_pattern(3) }
 
         p.add(3)  { mark(:opt) >> postfix_pattern("?", 4) }
         p.add(3)  { mark(:plus) >> postfix_pattern("+", 4) }
@@ -73,7 +66,7 @@ module Glush
       end
 
       def str_char(close_char)
-        escape_char |
+        mark(:escape) >> escape_char >> mark(:end) |
         inv(str(close_char) | str("\\"))
       end
 
@@ -82,13 +75,13 @@ module Glush
         .reduce { |a, b| a | b }
 
       def escape_char
-        mark(:escape_lit) >> str("\\") >> ESCAPE_CHARS >> mark |
-        mark(:escape_unicode) >> str("\\u") >> unicode_hex >> mark
+        str("\\") >> mark(:escape_lit) >> ESCAPE_CHARS |
+        str("\\u") >> unicode_hex
       end
 
       def unicode_hex
-        mark >> hex >> hex >> hex >> hex >> mark |
-        str("{") >> mark >> hex.plus >> mark >> str("}")
+        mark(:escape_unicode) >> hex >> hex >> hex >> hex >> mark(:end) |
+        str("{") >> mark(:escape_unicode) >> hex.plus >> mark(:end) >> str("}")
       end
 
       def hex
@@ -96,8 +89,8 @@ module Glush
       end
 
       def ebnf_str
-        str("\"") >> mark(:string) >> str_char("\"").star >> mark >> str("\"") |
-        str("'")  >> mark(:string) >> str_char("'").star >> mark >> str("'")
+        str("\"") >> mark(:string) >> str_char("\"").star >> mark(:end) >> str("\"") |
+        str("'")  >> mark(:string) >> str_char("'").star >> mark(:end) >> str("'")
       end
 
       def ident_fst
@@ -109,11 +102,14 @@ module Glush
       end
 
       def_rule :number do
-        mark(:number) >> str("0".."9").plus >> mark
+        mark(:number) >> str("0".."9").plus >> mark(:end)
       end
 
-      def_rule :ident, guard: inv(ident_rest) do
-        mark(:ident) >> ident_fst >> ident_rest.star >> mark
+      def_rule :ident do
+        mark(:ident) >> (
+          boundary(ident_fst, inv(ident_rest)) |
+          boundary(ident_fst >> ident_rest.plus, inv(ident_rest))
+        ) >> mark(:end)
       end
 
       def_rule :main do
@@ -128,14 +124,14 @@ module Glush
 
       def initialize(marks, string)
         setup_state(marks, string)
-        @grammar = Glush::Grammar.new
 
+        @dsl = DSL.new
         @calls = Hash.new
         @precs = Hash.new
       end
 
       def compile_pattern(ast)
-        return ast if ast.is_a?(Patterns::Base)
+        return ast if ast.is_a?(Expr::Base)
 
         case ast[0]
         when :send
@@ -143,24 +139,34 @@ module Glush
         when :call
           @calls.fetch(ast[1]).call
         when :inv
-          @grammar.inv(compile_pattern(ast[1]))
+          @dsl.inv(@dsl.inline(compile_pattern(ast[1])))
         when :call_level
           builder = @precs.fetch(ast[1])
           level = builder.resolve_level(ast[2])
           builder.call_for(level)
+        when :ahead
+          left = @dsl.inline(compile_pattern(ast[1]))
+          right = @dsl.inline(compile_pattern(ast[2]))
+          @dsl.boundary(left, right)
+        else
+          raise "unknown type: #{ast[0]}"
         end
       end
 
       def finalize
-        fst_call = @calls.values.first
-        @grammar.finalize(fst_call.call)
-        @grammar
+        @calls.values.first.call
       end
 
       def process_seq(mark)
         left = process
         right = process
         [:send, left, :>>, right]
+      end
+
+      def process_ahead(mark)
+        left = process
+        right = process
+        [:ahead, left, right]
       end
 
       def process_alt(mark)
@@ -188,7 +194,7 @@ module Glush
         name = process
         case name
         when "any"
-          @grammar.anytoken
+          @dsl.anytoken
         else
           [:call, name]
         end
@@ -207,12 +213,12 @@ module Glush
 
       def process_pstring(mark)
         text = process
-        @grammar.str(text)
+        @dsl.str(text)
       end
 
       def process_pmark(mark)
         ident = process
-        @grammar.mark(ident.to_sym)
+        @dsl.mark(ident.to_sym)
       end
 
       def process_group(mark)
@@ -241,24 +247,28 @@ module Glush
       def process_string(mark)
         result = String.new
         while true
-          result << string[mark.position...next_mark.position]
           case next_mark.name
+          when :escape
+            result << string[mark.position...next_mark.position]
+            mark = next_mark; shift
           when :escape_lit
-            slash_start = next_mark; shift
-            char = string[slash_start.position+1]
+            char = string[mark.position+1]
             result << ESCAPE_CHAR_MAPPING.fetch(char)
             mark = next_mark; shift
+            mark = next_mark; shift
           when :escape_unicode
-            shift
             hex_start = next_mark; shift
             hex_stop = next_mark; shift
             hex = string[hex_start.position...hex_stop.position]
             char = hex.to_i(16).chr(Encoding::UTF_8)
             result << char
             mark = next_mark; shift
-          when :mark
+          when :end
+            result << string[mark.position...next_mark.position]
             shift
             break
+          else
+            raise "unhandled mark: #{next_mark.name}"
           end
         end
         result
@@ -273,23 +283,16 @@ module Glush
       def process_prange(mark)
         str1 = process
         str2 = process
-        @grammar.str(str1..str2)
+        @dsl.str(str1..str2)
       end
 
       def process_rule(mark)
         name = process
         pattern = process
 
-        if next_mark && next_mark.name == :guard
-          shift
-          guard = process
-          guard_pattern = compile_pattern(guard)
-        end
-
-        rule = @grammar._new_rule(name) {
+        rule = @dsl._new_rule(name) {
           compile_pattern(pattern)
         }
-        rule.guard = guard_pattern if guard_pattern
 
         @calls[name] = proc { rule.call }
       end
@@ -297,8 +300,8 @@ module Glush
       def process_prec_rule(mark)
         name = process
 
-        builder = @precs[name] = Glush::Grammar::PrecBuilder.new(@grammar, name)
-        while next_mark.name == :prec_branch
+        builder = @precs[name] = Glush::DSL::PrecBuilder.new(@dsl, name)
+        while next_mark && next_mark.name == :prec_branch
           proc {
             # We need this because of closures
             shift
@@ -316,8 +319,8 @@ module Glush
     Parser = Glush::DefaultParser.new(Grammar)
 
     def self.create_grammar(ebnf)
-      result = Parser.parse(ebnf).unwrap
-      marks = result.marks
+      result = Parser.parse!(ebnf)
+      marks = result.data
       processor = Processor.new(marks, ebnf)
       processor.process_all
       processor.finalize

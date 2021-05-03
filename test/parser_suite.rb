@@ -6,20 +6,27 @@ ParserSuite = proc do
   def self.assert_recognize(input)
     it "should recognize" do
       assert parser.recognize?(input), "expected match for input: #{input}"
+      if parser.respond_to?(:parser)
+        refute parser.parse(input).error?, "expected parse to succeed for input: #{input}"
+      end
     end
   end
 
   def self.refute_recognize(input)
     it "should not recognize" do
       refute parser.recognize?(input), "expected no match for input: #{input}"
+
+      if parser.respond_to?(:parser)
+        assert parser.parse(input).error?, "expected parse to fail for input: #{input}"
+      end
     end
   end
 
   def self.assert_marks(input, marks)
     it "should match marks" do
       skip unless parser.respond_to?(:parse)
-      result = parser.parse(input).unwrap
-      assert_equal marks, result.marks.map(&:to_a)
+      success = parser.parse!(input)
+      assert_equal marks, success.data.map(&:to_a)
     end
   end
 
@@ -30,6 +37,13 @@ ParserSuite = proc do
     refute_recognize "("
     assert_recognize "()"
     assert_recognize "(())"
+  end
+
+  describe(:ones) do
+    let(:grammar) { TestGrammars.ones }
+    (1..15).each do |num|
+      assert_recognize "1" * num
+    end
   end
 
   describe(:empty_left_recursion) do
@@ -76,6 +90,8 @@ ParserSuite = proc do
 
     assert_recognize "n"
     assert_recognize "n+n"
+    assert_recognize "n*n"
+    assert_recognize "n+n*n"
     assert_recognize "n+n*n/n-n*n-n"
     refute_recognize "n+n*n/n-nn-n"
 
@@ -92,61 +108,6 @@ ParserSuite = proc do
     ]
   end
 
-  it "should reject empty mark rules" do
-    assert_raises Glush::GrammarError do
-      g = Glush::Grammar.new {
-        def_rule :m do
-          mark(:empty) |
-          mark(:non_empty) >> str("a")
-        end
-
-        def_rule :main do
-          m | m >> str("a")
-        end
-
-        main
-      }
-
-      recognize?(g, "a")
-    end
-  end
-
-  it "should reject seq empty mark rules" do
-    assert_raises Glush::GrammarError do
-      g = Glush::Grammar.new {
-        def_rule :m do
-          mark(:empty) >> mark(:empty)
-        end
-
-        def_rule :main do
-          m | m >> str("a")
-        end
-
-        main
-      }
-
-      recognize?(g, "a")
-    end
-  end
-
-  it "should reject many empty mark rules" do
-    assert_raises Glush::GrammarError do
-      g = Glush::Grammar.new {
-        def_rule :m do
-          mark(:empty).plus
-        end
-
-        def_rule :main do
-          m | m >> str("a")
-        end
-
-        main
-      }
-
-      recognize?(g, "a")
-    end
-  end
-
   describe(:comments) do
     let(:grammar) { TestGrammars.comments }
 
@@ -157,9 +118,17 @@ ParserSuite = proc do
     refute_recognize "a#"
   end
 
+  describe(:ident_boundary) do
+    let(:grammar) { TestGrammars.ident_boundary }
+
+    refute_recognize "aa"
+    assert_recognize "a a"
+    assert_recognize "aabsdasd    asd"
+  end
+
   describe("re-used patterns") do
     let(:grammar) do
-      Glush::Grammar.new {
+      Glush::DSL.build {
         def_rule :main do
           foo = str("a")
           foo >> foo >> foo
@@ -208,7 +177,7 @@ ParserSuite = proc do
 
   describe("any") {
     let(:grammar) {
-      Glush::Grammar.new {
+      Glush::DSL.build {
         def_rule :s do
           str("a") >> anytoken
         end
@@ -222,25 +191,138 @@ ParserSuite = proc do
     refute_recognize "aaa"
   }
 
-  describe("guards") {
+  describe("nested tail call") {
     let(:grammar) {
-      Glush::Grammar.new {
-        def_rule :ident, guard: inv(str("a")) do
-          str("a").plus
+      Glush::DSL.build {
+        def_rule :s do
+          str("s") >> b
         end
 
-        def_rule :s do
-          ident |
-          ident >> str(" ").star >> ident
+        def_rule :b do
+          str("b") >> a
+        end
+
+        def_rule :a do
+          str("a")
         end
 
         s
       }
     }
 
-    assert_marks "a", []
-    assert_marks "aa", []
-    assert_marks "aa aa", []
+    assert_recognize "sba"
+    refute_recognize "sb"
+  }
+
+  describe("tail recursive alias") {
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :s do
+          str("s") >> a
+        end
+
+        def_rule :a do
+          b
+        end
+
+        def_rule :b do
+          str("b")
+        end
+
+        s
+      }
+    }
+
+    assert_recognize "sb"
+  }
+
+  describe("non-rule entry") {
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :s do
+          str("1")
+        end
+
+        str("a") >> s >> str("b")
+      }
+    }
+
+    assert_recognize "a1b"
+  }
+
+  describe("basic left recursive") {
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :a do
+          mark(:a) >> b >> str("a")
+        end
+
+        def_rule :b do
+          c >> str("b") >> mark(:b_done)
+        end
+
+        def_rule :c do
+          mark(:c) >> str("c") >> mark(:c_done)
+        end
+
+        def_rule :a_indirect do
+          a
+        end
+
+        str("s") >> a_indirect >> str("s")
+      }
+    }
+
+    assert_recognize "scbas"
+  }
+
+  describe("mixed recursive") {
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :a do
+          str("a") >> b
+        end
+
+        def_rule :b do
+          c >> str("b")
+        end
+
+        def_rule :c do
+          str("c")
+        end
+
+        a
+      }
+    }
+
+    assert_recognize "acb"
+  }
+
+  describe("mixed nested recursive") {
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :a do
+          str("a") >> b
+        end
+
+        def_rule :b do
+          c >> str("b")
+        end
+
+        def_rule :c do
+          d >> str("c")
+        end
+
+        def_rule :d do
+          str("d")
+        end
+
+        a
+      }
+    }
+
+    assert_recognize "adcb"
+    refute_recognize "adc"
   }
 
   describe("error reporting") {
@@ -268,8 +350,84 @@ ParserSuite = proc do
     it "can extract marks from result" do
       result = parser.parse("n*n")
       refute result.error?
-      assert result.marks
+      assert result.data
     end
+  }
+
+  describe("prec_nested") do
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :main do
+          mark(:rule) >> ident >> str("=") >> ebnf_pattern
+        end
+
+        prec_rule :ebnf_pattern do |p|
+          p.add(1) { mark(:inv) >> str("!") }
+          p.add(2) { mark(:pident) >> ident }
+        end
+  
+        def_rule :ident do
+          mark(:ident) >> str("a".."z").plus >> mark(:end)
+        end
+  
+        main
+      }
+    }
+
+    assert_marks "a=b", [
+      [:rule, 0],
+        [:ident, 0], [:end, 1],
+        [:pident, 2], [:ident, 2], [:end, 3],
+    ]
+  end
+
+  describe("marks after last call") do
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :a do
+          str("a")
+        end
+
+        def_rule :main do
+          str("b") >> a >> mark(:done)
+        end
+
+        main
+      }
+    }
+
+    assert_marks "ba", [
+      [:done, 2]
+    ]
+  end
+
+  describe("nested marks in calls") {
+    let(:grammar) {
+      Glush::DSL.build {
+        def_rule :a do
+          mark(:a) >> str("a") >> mark(:a2)
+        end
+
+        def_rule :b do
+          mark(:b) >> a >> mark(:b2)
+        end
+
+        def_rule :c do
+          mark(:c) >> b >> mark(:c2)
+        end
+
+        c
+      }
+    }
+
+    assert_marks "a", [
+      [:c, 0],
+      [:b, 0],
+      [:a, 0],
+      [:a2, 1],
+      [:b2, 1],
+      [:c2, 1],
+    ]
   }
 end
 

@@ -11,6 +11,7 @@ module Glush
 
     def initialize(position)
       @position = position
+      super("parse error at #{position}")
     end
 
     def error?
@@ -23,12 +24,10 @@ module Glush
   end
 
   class ParseSuccess
-    def initialize(result)
-      @result = result
-    end
+    attr_reader :data
 
-    def marks
-      @result.marks
+    def initialize(data)
+      @data = data
     end
 
     def error?
@@ -40,20 +39,19 @@ module Glush
     end
   end
 
-  autoload :Grammar, __dir__ + '/glush/grammar.rb'
-  autoload :Patterns, __dir__ + '/glush/patterns.rb'
-  autoload :StateMachine, __dir__ + '/glush/state_machine.rb'
-
-  autoload :SMParser, __dir__ + '/glush/sm_parser.rb'
-
-  autoload :JavaScriptGenerator, __dir__ + '/glush/javascript_generator.rb'
-  autoload :DuktapeParser, __dir__ + '/glush/duktape_parser.rb'
-
+  autoload :CLI, __dir__ + '/glush/cli.rb'
   autoload :DefaultParser, __dir__ + '/glush/default_parser.rb'
-
-  autoload :List, __dir__ + '/glush/list.rb'
-  autoload :MarkProcessor, __dir__ + '/glush/mark_processor.rb'
-
+  autoload :DSL, __dir__ + '/glush/dsl.rb'
+  autoload :DuktapeParser, __dir__ + '/glush/duktape_parser.rb'
   autoload :EBNF, __dir__ + '/glush/ebnf.rb'
+  autoload :Expr, __dir__ + '/glush/expr.rb'
+  autoload :ExprMatcher, __dir__ + '/glush/expr_matcher.rb'
+  autoload :FixpointBuilder, __dir__ + '/glush/fixpoint_builder.rb'
+  autoload :JavaScriptGenerator, __dir__ + '/glush/javascript_generator.rb'
+  autoload :MarkProcessor, __dir__ + '/glush/mark_processor.rb'
+  autoload :PartitionRefinement, __dir__ + '/glush/partition_refinement.rb'
+  autoload :P1, __dir__ + '/glush/p1.rb'
+  autoload :P2, __dir__ + '/glush/p2.rb'
+  autoload :Utils, __dir__ + '/glush/utils.rb'
 end
 

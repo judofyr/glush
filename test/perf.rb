@@ -4,26 +4,30 @@ require_relative 'grammars'
 require 'benchmark'
 
 class Perf
-  Parser = Glush::DirectParser
+  Parser = Glush::P1
 
   def self.run
     parser = Parser.new(grammar)
+
+    i = 5
 
     range.each do |n|
       print n, " "
       str = build(n)
       time = Benchmark.measure do
-        result = parser.recognize?(str)
-        raise "failed to recognize" if !result
+        i.times do
+          result = parser.recognize?(str)
+          raise "failed to recognize: #{str}" if !result
+        end
       end
-      print time.real, "\n"
+      print time.real / i, "\n"
     end
   end
 end
 
 class APerf < Perf
   def self.range
-    (30..80).step(5)
+    (50..150).step(5)
   end
   
   def self.build(n)

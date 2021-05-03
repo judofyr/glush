@@ -2,41 +2,38 @@ require 'duktape'
 
 module Glush
   class DuktapeParser
-    def initialize(grammar)
-      js = JavaScriptGenerator.generate(grammar)
-      @context = Duktape::Context.new
-      @context.define_function("log") { |x| p x }
-      @context.exec_string(js, "glush.generated.js")
+    def initialize(expr)
+      @expr = expr
     end
 
-    def recognize?(input)
-      @context.call_prop('recognize', input)
+    def generate_javascript
+      result = String.new
+      gen = JavaScriptGenerator.new(@expr)
+      gen.write(result)
+      result
     end
 
-    class Result
-      def initialize(plain_marks)
-        @plain_marks = plain_marks
-      end
-
-      def marks
-        @marks ||= @plain_marks.map { |m|
-          Mark.new(m["name"].to_sym, m["position"].to_i)
-        }
+    def context
+      @context ||= Duktape::Context.new.tap do |ctx|
+        ctx.exec_string(generate_javascript, "input.js")
       end
     end
 
-    def parse(input)
-      result = @context.call_prop('parse', input)
-      case result["type"]
-      when "error"
-        position = result["position"].to_i
-        ParseError.new(position)
-      when "success"
-        ParseSuccess.new(Result.new(result["marks"]))
+    def recognize?(str)
+      context.call_prop("recognize", str)
+    end
+
+    def parse(str)
+      result = context.call_prop("parse", str)
+      if result["type"] == "success"
+        ParseSuccess.new(result["marks"].map { |mark| Mark.new(mark["name"].to_sym, mark["position"].to_i) })
       else
-        raise "unknown type: #{result["type"].inspect}"
+        ParseError.new(result["position"].to_i)
       end
+    end
+
+    def parse!(str)
+      parse(str).unwrap
     end
   end
 end
-

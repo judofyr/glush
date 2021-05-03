@@ -1,4 +1,3 @@
 module Glush
-  DefaultParser = SMParser
+  DefaultParser = P2
 end
-

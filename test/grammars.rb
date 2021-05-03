@@ -4,7 +4,7 @@ module TestGrammars
   module_function
 
   def paren
-    @paren ||= Glush::Grammar.new {
+    @paren ||= Glush::DSL.build {
       def_rule :paren do
         eps | (str("(") >> paren >> str(")"))
       end
@@ -14,7 +14,7 @@ module TestGrammars
   end
 
   def paren_one
-    @paren_one ||= Glush::Grammar.new {
+    @paren_one ||= Glush::DSL.build {
       def_rule :paren do
         str("1") >> str("2").maybe |
         str("(") >> paren >> str(")")
@@ -24,8 +24,19 @@ module TestGrammars
     }
   end
 
+  def ones
+    @ones ||= Glush::DSL.build {
+      def_rule :s do
+        s >> str("1") |
+        str("1")
+      end
+
+      s
+    }
+  end
+
   def right_recurse
-    @right_recurse ||= Glush::Grammar.new {
+    @right_recurse ||= Glush::DSL.build {
       def_rule :atom do
         str("1")
       end
@@ -39,7 +50,7 @@ module TestGrammars
   end
 
   def empty_left_recursion
-    @empty_left_recursion ||= Glush::Grammar.new {
+    @empty_left_recursion ||= Glush::DSL.build {
       def_rule :s do
         s >> str("+") >> s |
         eps
@@ -51,11 +62,11 @@ module TestGrammars
 
   def super_ambigous
     # http://www.codecommit.com/blog/scala/unveiling-the-mysteries-of-gll-part-2
-    @super_ambigous ||= Glush::Grammar.new {
+    @super_ambigous ||= Glush::DSL.build {
       def_rule :s do
         s >> s >> s |
         s >> s |
-        str("a")
+        (str("a") | str("b"))
       end
 
       s
@@ -63,7 +74,7 @@ module TestGrammars
   end
 
   def three_a
-    @three_a ||= Glush::Grammar.new {
+    @three_a ||= Glush::DSL.build {
       def_rule :s do
         s >> s >> s |
         str("a")
@@ -74,7 +85,7 @@ module TestGrammars
   end
 
   def amb_expr
-    @amb_expr ||= Glush::Grammar.new {
+    @amb_expr ||= Glush::DSL.build {
       def_rule :expr do
         expr >> str("+") >> expr |
         expr >> str("-") >> expr |
@@ -88,7 +99,7 @@ module TestGrammars
   end
 
   def manual_expr
-    @manual_expr ||= Glush::Grammar.new {
+    @manual_expr ||= Glush::DSL.build {
       def_rule :add_expr do
         mark(:add) >> add_expr >> str("+") >> mul_expr |
         mark(:sub) >> add_expr >> str("-") >> mul_expr |
@@ -101,12 +112,12 @@ module TestGrammars
         base
       end
 
-      def base
+      def_rule :base do
         mark(:n) >> str("n")
       end
 
       def expr
-        add_expr
+       add_expr
       end
 
       expr
@@ -114,7 +125,7 @@ module TestGrammars
   end
 
   def prec_expr
-    @prec_expr ||= Glush::Grammar.new {
+    @prec_expr ||= Glush::DSL.build {
       prec_rule :expr do |prec|
         prec.add(9) { mark(:n) >> str("n") }
         prec.add(1) { mark(:add) >> expr(1) >> str("+") >> expr(2) }
@@ -129,13 +140,33 @@ module TestGrammars
   end
 
   def comments
-    @comments ||= Glush::Grammar.new {
+    @comments ||= Glush::DSL.build {
       def comment
         str("#") >> inv(str("\n")).star >> str("\n")
       end
 
       def_rule :main do
         (str("a") >> comment.maybe).star
+      end
+
+      main
+    }
+  end
+
+  def ident_boundary
+    @ident_boundary ||= Glush::DSL.build {
+      char = str("a".."z")
+
+      def_rule :ident do
+        boundary(char.plus, inv(char))
+      end
+
+      def_rule :_ do
+        str(" ").star
+      end
+
+      def_rule :main do
+        ident >> _ >> ident
       end
 
       main

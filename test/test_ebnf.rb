@@ -33,7 +33,7 @@ class TestEBNF < Minitest::Spec
     it "should match marks" do
       result = parser.parse(input)
       refute result.error?, "expected match for input: #{input}"
-      assert_equal result.marks.map(&:to_a), marks
+      assert_equal result.data.map(&:to_a), marks
     end
   end
 
@@ -152,6 +152,7 @@ class TestEBNF < Minitest::Spec
     assert_matches "0"
     assert_matches "1"
     assert_matches "8"
+    assert_matches "9"
     refute_matches "a"
   end
 
@@ -161,6 +162,20 @@ class TestEBNF < Minitest::Spec
     } }
 
     assert_matches "a\nabåbc😀c"
+  end
+
+  describe("look ahead") do
+    let(:ebnf) { %{
+      S = ident _ num
+      _ = " "*
+      char = 'a'..'z' | '0'..'9'
+      ident = char+ &!char
+      num = '0'..'9'+
+    } }
+
+    refute_matches "abc05"
+    assert_matches "abc 05"
+    assert_matches "abc05 4"
   end
 end
 
